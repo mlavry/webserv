@@ -1,0 +1,36 @@
+🧩 Exemple de réponse HTTP
+
+HTTP/1.1 200 OK\r\n
+Content-Length: 5\r\n
+\r\n
+Hello
+
+
+🔍 Décomposition
+
+1. Ligne de statut
+
+HTTP/1.1 200 OK\r\n
+
+2. Headers
+
+Content-Length: 5\r\n
+
+3. Ligne vide obligatoire
+
+\r\n
+
+👉 très important :
+sépare les headers du body
+
+4. Body
+
+Hello
+
+
+⚠️ Si tu ne mets pas \r\n
+👉 le client (navigateur ou curl) peut :
+
+ne rien afficher
+attendre indéfiniment
+considérer la réponse invalide

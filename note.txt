@@ -1,0 +1,321 @@
+1. Finir le vrai serveur minimal HTTP
+
+But : passer de “client connecté” à “le client reçoit une réponse HTTP”.
+
+À faire :
+
+lire la requête avec recv()
+afficher la requête brute dans le terminal
+envoyer une réponse HTTP fixe valide
+fermer le client après réponse
+
+Objectif de test :
+
+curl http://127.0.0.1:8080 doit afficher Hello
+un navigateur doit au moins recevoir une vraie réponse
+
+-----------------------------------------------------------------
+
+
+
+
+2. Mettre aussi les clients en non-bloquant
+
+Pour l’instant tu as mis seulement server_fd en non-bloquant.
+
+À faire :
+
+après accept(), faire aussi fcntl(client_fd, ...)
+
+Pourquoi :
+
+le sujet veut du non-bloquant pour les I/O réseau
+plus tard tu ne pourras pas faire un vrai serveur propre sans ça
+
+
+
+
+3. Stocker l’état de chaque client
+
+Là, tu acceptes un client puis tu le fermes tout de suite. Il faut commencer à garder une trace de chaque connexion.
+
+À faire :
+
+créer une petite structure Client
+y mettre au minimum :
+fd
+buffer de lecture
+buffer de réponse
+état du client
+
+Exemple d’états utiles :
+
+lecture requête
+requête complète
+réponse prête
+écriture réponse
+fermeture
+
+C’est une étape très importante pour la suite.
+
+
+
+
+4. Passer d’un seul pollfd à plusieurs
+
+Pour l’instant tu surveilles seulement server_fd.
+
+À faire :
+
+utiliser un std::vector<pollfd>
+garder server_fd dedans
+ajouter chaque client_fd
+parcourir tous les fd après poll()
+
+Logique :
+
+server_fd avec POLLIN → accept
+client_fd avec POLLIN → recv
+client_fd avec POLLOUT → send
+
+Là tu commences à ressembler à un vrai webserv.
+
+
+
+
+
+5. Détecter la fin des headers HTTP
+
+Avant de parser proprement, il faut savoir quand la requête est complète.
+
+À faire :
+
+accumuler les données reçues dans un buffer string
+détecter \r\n\r\n
+
+Objectif :
+
+tant que \r\n\r\n n’est pas présent, la requête n’est pas complète
+après ça, tu peux commencer le parsing minimal
+
+
+
+
+
+6. Parser le minimum vital
+
+Ne pars pas directement sur un parseur complet.
+
+À faire d’abord :
+
+parser la première ligne :
+méthode
+path
+version
+stocker les headers principaux
+détecter si la requête est invalide
+
+Objectif initial :
+
+comprendre GET / HTTP/1.1
+répondre correctement à quelques cas simples
+
+
+
+
+7. Gérer les premières réponses utiles
+
+Avant les fichiers, fais quelques statuts propres.
+
+À faire :
+
+200 OK
+400 Bad Request
+404 Not Found
+405 Method Not Allowed
+
+Le sujet insiste sur des codes de statut corrects
+
+
+
+
+
+8. Servir un vrai fichier statique
+
+C’est probablement la prochaine grosse étape rentable.
+
+À faire :
+
+définir un root simple, par exemple ./www
+si GET / → servir index.html
+si fichier absent → 404
+ajouter Content-Type simple
+
+Objectif :
+
+ouvrir un vrai HTML dans le navigateur
+
+
+
+
+
+9. Commencer un vrai fichier de config minimal
+
+Ne fais pas tout nginx-like d’un coup.
+
+Commence par supporter seulement :
+
+listen
+root
+index
+
+Exemple :
+
+server {
+    listen 127.0.0.1:8080;
+    root ./www;
+    index index.html;
+}
+
+But :
+
+remplacer les valeurs codées en dur par des valeurs lues dans la config
+
+Le sujet impose un fichier de configuration
+
+
+
+
+10. Structurer le projet en classes/fichiers
+
+À ce moment-là, il faut éviter le gros main.cpp.
+
+Découpage conseillé :
+
+Server
+Client
+HttpRequest
+HttpResponse
+ConfigParser
+Webserv ou EventLoop
+
+Ça te sauvera quand tu ajouteras POST, DELETE, CGI, uploads.
+
+
+
+
+11. Ajouter les méthodes progressivement
+
+Ordre conseillé :
+
+GET
+POST simple
+DELETE
+
+Ne fais pas tout d’un coup.
+
+Pour POST, commence par :
+
+lire un body simple avec Content-Length
+juste stocker ou afficher ce qui a été reçu
+
+Pour DELETE, commence par :
+
+suppression d’un fichier simple autorisé
+
+
+
+
+12. Ajouter les pages d’erreur par défaut
+
+Le sujet le demande si aucune page perso n’est fournie
+
+À faire :
+
+générer une petite page HTML par défaut pour 404, 405, 500, etc.
+
+
+
+
+
+13. Ajouter les règles par route
+
+Quand la base marche, ajoute :
+
+méthodes autorisées
+redirection
+root spécifique
+autoindex on/off
+index
+upload path
+
+C’est là que ta config commencera à devenir vraiment utile
+
+
+
+
+
+14. Gérer les uploads
+
+Avant CGI.
+
+À faire :
+
+autoriser POST sur certaines routes
+écrire le body reçu dans un fichier
+respecter la limite de taille du body
+
+Le sujet demande explicitement l’upload de fichiers
+
+
+
+
+
+15. Ajouter le multi-port
+
+Une fois que ton architecture est propre.
+
+À faire :
+
+plusieurs sockets serveurs
+chacun ajouté à poll
+chaque socket lié à une config serveur
+
+Le sujet demande de pouvoir écouter sur plusieurs ports
+
+
+
+
+16. CGI en dernier gros bloc mandatory
+
+Ne le commence pas avant que le reste soit propre.
+
+À faire :
+
+exécuter au moins un CGI
+passer l’environnement correct
+fournir le body au CGI
+récupérer sa sortie
+transformer ça en réponse HTTP
+
+Le sujet insiste aussi sur le comportement particulier des CGI et sur le fait que fork ne doit servir qu’à ça
+
+
+
+
+
+17. Tests et robustesse
+
+À faire tout au long du projet :
+
+curl
+navigateur
+nc
+tests maison en Python/C++
+clients multiples
+requêtes invalides
+gros body
+déconnexion brutale
+stress tests
+
+Le sujet insiste sur la résilience et le fait de ne pas tester avec un seul programme

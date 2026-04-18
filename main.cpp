@@ -6,22 +6,20 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/14 17:15:28 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/16 12:47:19 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/18 02:06:25 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <iostream>
-#include <unistd.h>
-#include <fcntl.h>
-#include <cstring>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <poll.h>
+#include "Server.hpp"
 
 int main(void)
 {
-	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	Server server;
+	if (!server.initServer())
+		return (1);
+	server.run();
+	return (0);
+	/*int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd < 0)
 	{
 		std::cerr << "Erreur socket" << std::endl;
@@ -47,13 +45,18 @@ int main(void)
 	
 	fcntl(server_fd, F_SETFL, O_NONBLOCK);
 
-	pollfd fds[1];
-	fds[0].fd = server_fd;
-	fds[0].events = POLLIN;
+
+
+	
+	std::vector<pollfd> fds;
+	pollfd server_poll_fd;
+	server_poll_fd.fd = server_fd;
+	server_poll_fd.events = POLLIN;
+	fds.push_back(server_poll_fd);
 
 	while (true)
 	{
-		int ret = poll(fds, 1, -1);
+		int ret = poll(&fds[0], 1, -1);
 		if (ret < 0)
 		{
 			std::cerr << "Erreur poll" << std::endl;
@@ -64,10 +67,30 @@ int main(void)
 			int client_fd = accept(server_fd, NULL, NULL);
 			if (client_fd < 0)
 				continue;
-			std::cout << "Client connecté" << std::endl;
+			fcntl(client_fd, F_SETFL, O_NONBLOCK);
+			pollfd client_poll_fd;
+			client_poll_fd.fd = client_fd;
+			client_poll_fd.events = POLLIN;
+			fds.push_back(client_poll_fd);
+			std::cout << "Client ajouté dans poll" << std::endl;
+			
+			char buffer[1024];
+			int bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+			if (bytes > 0)
+			{
+				buffer[bytes] = '\0';
+				std::cout << buffer << std::endl;
+
+				const char* response = 
+					"HTTP/1.1 200 OK\r\n"
+					"\r\n"
+					"Hello";
+				
+				send(client_fd, response, strlen(response), 0);
+			}
 			close(client_fd);
 		}
-	}
+	}*/
 }
 
 //AF_INET IPv4
