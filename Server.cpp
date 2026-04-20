@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/20 14:56:49 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/20 15:40:03 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -123,8 +123,11 @@ void Server::run()
 					buffer[bytes] = '\0';
 					std::cout << buffer << std::endl;
 
-					const char* response = 
+					const char* response =
 						"HTTP/1.1 200 OK\r\n"
+						"Content-Length: 5\r\n"
+						"Content-Type: text/plain\r\n"
+						"Connection: close\r\n"
 						"\r\n"
 						"Hello";
 				
