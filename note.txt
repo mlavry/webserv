@@ -34,7 +34,6 @@ plus tard tu ne pourras pas faire un vrai serveur propre sans ça
 
 
 
-
 3. Stocker l’état de chaque client
 
 Là, tu acceptes un client puis tu le fermes tout de suite. Il faut commencer à garder une trace de chaque connexion.

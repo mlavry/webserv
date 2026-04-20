@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/18 01:58:55 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/20 14:56:49 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,10 +37,10 @@ bool Server::initServer()
 		std::cerr << "Erreur socket" << std::endl;
 		return (false);
 	}
-	
+
 	_serverAddress.sin_family = AF_INET;
 	_serverAddress.sin_port = htons(8080);
-	_serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+	_serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);//inet_addr("0.0.0.0");
 
 	// On attache le socket a une adresse 
 	if (bind(_serverFd, (struct sockaddr *)&_serverAddress, 
@@ -83,39 +83,57 @@ void Server::run()
 
 	while (true)
 	{
-		int ret = poll(&_fds[0], 1, -1);
+		int ret = poll(&_fds[0], _fds.size(), -1);
 		if (ret < 0)
 		{
 			std::cerr << "Erreur poll" << std::endl;
 			break;
 		}
-		if (_fds[0].revents & POLLIN)
+		for (int i = 0; i < (int)_fds.size(); i++)
 		{
-			int client_fd = accept(_serverFd, NULL, NULL);
-			if (client_fd < 0)
+			if (!(_fds[i].revents & POLLIN))
 				continue;
-			fcntl(client_fd, F_SETFL, O_NONBLOCK);
-			pollfd client_poll_fd;
-			client_poll_fd.fd = client_fd;
-			client_poll_fd.events = POLLIN;
-			_fds.push_back(client_poll_fd);
-			std::cout << "Client ajouté dans poll" << std::endl;
-			
-			char buffer[1024];
-			int bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-			if (bytes > 0)
-			{
-				buffer[bytes] = '\0';
-				std::cout << buffer << std::endl;
 
-				const char* response = 
-					"HTTP/1.1 200 OK\r\n"
-					"\r\n"
-					"Hello";
+			if (_fds[i].fd == _serverFd)
+			{
+				int client_fd = accept(_serverFd, NULL, NULL);
+				if (client_fd < 0)
+					continue;
+
+				int flags = fcntl(client_fd, F_GETFL, 0);
+				if (flags < 0 || fcntl(client_fd, F_SETFL, flags | O_NONBLOCK)
+					< 0)
+				{
+					close(client_fd);
+					continue;
+				}
 				
-				send(client_fd, response, strlen(response), 0);
+				pollfd client_poll_fd;
+				client_poll_fd.fd = client_fd;
+				client_poll_fd.events = POLLIN;
+				_fds.push_back(client_poll_fd);
+				std::cout << "Client ajouté dans poll" << std::endl;
 			}
-			close(client_fd);
+			else
+			{
+				char buffer[1024];
+				int bytes = recv(_fds[i].fd, buffer, sizeof(buffer) - 1, 0);
+				if (bytes > 0)
+				{
+					buffer[bytes] = '\0';
+					std::cout << buffer << std::endl;
+
+					const char* response = 
+						"HTTP/1.1 200 OK\r\n"
+						"\r\n"
+						"Hello";
+				
+					send(_fds[i].fd, response, strlen(response), 0);
+				}
+				close(_fds[i].fd);
+				_fds.erase(_fds.begin() + i);
+				i--;
+			}
 		}
 	}
 }
