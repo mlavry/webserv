@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/18 01:11:06 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/22 12:33:35 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <map>
+#include "Client.hpp"
 
 class Server
 {
@@ -33,10 +35,18 @@ class Server
 		int _serverFd;
 		sockaddr_in _serverAddress;
 		std::vector<pollfd> _fds;
+		std::map<int, Client> _clients;
 		
 		//------------ Forme canonique ----------
 		Server(const Server& other);
 		Server& operator=(const Server& other);
+
+		//------------ Methode privée ----------
+		void initPoll();
+		bool checkPoll();
+		void handleEvents();
+		void acceptClient();
+		void handleClient(int i);
 };
 
 #endif

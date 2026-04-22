@@ -1,39 +1,3 @@
-1. Finir le vrai serveur minimal HTTP
-
-But : passer de “client connecté” à “le client reçoit une réponse HTTP”.
-
-À faire :
-
-lire la requête avec recv()
-afficher la requête brute dans le terminal
-envoyer une réponse HTTP fixe valide
-fermer le client après réponse
-
-Objectif de test :
-
-curl http://127.0.0.1:8080 doit afficher Hello
-un navigateur doit au moins recevoir une vraie réponse
-
------------------------------------------------------------------
-
-
-
-
-2. Mettre aussi les clients en non-bloquant
-
-Pour l’instant tu as mis seulement server_fd en non-bloquant.
-
-À faire :
-
-après accept(), faire aussi fcntl(client_fd, ...)
-
-Pourquoi :
-
-le sujet veut du non-bloquant pour les I/O réseau
-plus tard tu ne pourras pas faire un vrai serveur propre sans ça
-
-
-
 3. Stocker l’état de chaque client
 
 Là, tu acceptes un client puis tu le fermes tout de suite. Il faut commencer à garder une trace de chaque connexion.
