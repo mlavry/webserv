@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/23 11:31:49 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/23 15:07:57 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,6 +29,14 @@ Server::~Server()
 		close(_serverFd);
 }
 
+bool Server::setSocketOption(int fd, int option)
+{
+	int opt = 1;
+	if (setsockopt(fd, SOL_SOCKET, option, &opt, sizeof(opt)) < 0)
+		return (false);
+	return (true);
+}
+
 bool Server::initServer()
 {
 	_serverFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -38,9 +46,18 @@ bool Server::initServer()
 		return (false);
 	}
 
+	// On permet au serveur de se relancer si le port est en cours de fermeture
+	if (!setSocketOption(_serverFd, SO_REUSEADDR))
+	{
+		std::cerr << "Erreur setsockopt" << std::endl;
+		close(_serverFd);
+		_serverFd = -1;
+		return (false);
+	}
+
 	_serverAddress.sin_family = AF_INET;
-	_serverAddress.sin_port = htons(8080);
-	_serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);//inet_addr("0.0.0.0");
+	_serverAddress.sin_port = htons(8082);
+	_serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");//htonl(INADDR_ANY);
 
 	// On attache le socket a une adresse 
 	if (bind(_serverFd, (struct sockaddr *)&_serverAddress, 
