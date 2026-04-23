@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:54 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/21 16:28:39 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/23 11:26:13 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,8 +23,9 @@ class Client
 		Client(int fd);
 
 		//----------- Variable publique ----------
-		int _fd;
-		std::string _request;
+		int fd;
+		std::string request;
+		std::string response;
 };
 
 #endif

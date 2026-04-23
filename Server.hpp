@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/22 12:33:35 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/23 11:08:31 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,7 +46,8 @@ class Server
 		bool checkPoll();
 		void handleEvents();
 		void acceptClient();
-		void handleClient(int i);
+		bool handleClient(int i);
+		void sendResponse(int i);
 };
 
 #endif

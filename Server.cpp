@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/22 12:35:36 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/23 11:31:49 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -116,26 +116,41 @@ void Server::acceptClient()
 	std::cout << "Client ajouté dans poll" << std::endl;
 }
 
-void Server::handleClient(int i)
+bool Server::handleClient(int i)
 {
+	Client &client = _clients[_fds[i].fd];
 	char buffer[1024];
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer) - 1, 0);
-	if (bytes > 0)
+	if (bytes <= 0)
 	{
-		buffer[bytes] = '\0';
-		std::cout << buffer << std::endl;
-
-		const char* response =
-			"HTTP/1.1 200 OK\r\n"
-			"Content-Length: 5\r\n"
-			"Content-Type: text/plain\r\n"
-			"Connection: close\r\n"
-			"\r\n"
-			"Hello";
-				
-		send(_fds[i].fd, response, strlen(response), 0);
+		close(_fds[i].fd);
+		_clients.erase(_fds[i].fd);
+		_fds.erase(_fds.begin() + i);
+		return (true);
 	}
+	buffer[bytes] = '\0';
+	client.request += buffer;
+	std::cout << client.request << std::endl;
+
+	client.response =
+		"HTTP/1.1 200 OK\r\n"
+		"Content-Length: 5\r\n"
+		"Content-Type: text/plain\r\n"
+		"Connection: close\r\n"
+		"\r\n"
+		"Hello";
+	_fds[i].events = POLLOUT;
+	return (false);
+}
+
+void Server::sendResponse(int i)
+{
+	Client &client = _clients[_fds[i].fd];
+	
+	send(_fds[i].fd, client.response.c_str(), client.response.size(), 0);
+	
 	close(_fds[i].fd);
+	_clients.erase(_fds[i].fd);
 	_fds.erase(_fds.begin() + i);
 }
 
@@ -143,16 +158,25 @@ void Server::handleEvents()
 {
 	for (int i = 0; i < (int)_fds.size(); i++)
 	{
-		if (!(_fds[i].revents & POLLIN))
-			continue;
 		if (_fds[i].fd == _serverFd)
-			acceptClient();
+		{
+			if (_fds[i].revents & POLLIN)
+				acceptClient();
+		}
 		else
 		{
-			handleClient(i);
-			i--;
+			bool removed = false;
+			if (_fds[i].revents & POLLIN)
+				removed = handleClient(i);
+			if (!removed && (_fds[i].revents & POLLOUT))
+			{
+				sendResponse(i);
+				removed = true;
+			}
+			if (removed)
+				i--;
 		}
-	}	
+	}
 }
 
 void Server::run()
