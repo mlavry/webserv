@@ -6,9 +6,12 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/28 18:38:44 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/28 18:50:54 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
+
+#define GREEN "\033[32m"
+#define RESET "\033[0m"
 
 #include "Server.hpp"
 
@@ -123,7 +126,7 @@ bool Server::checkPoll()
 	{
 		if (errno == EINTR) // Need utility check (remettre errno a 0 apres ?)
 		{
-			std::cout << "EINTR" << std::endl;
+			std::cout << "\n" GREEN "Arret du serveur..." RESET << std::endl;
 			return (true);
 		} // if block no util comment
 		std::cerr << "Erreur poll" << std::endl;
@@ -240,6 +243,7 @@ bool Server::handleEvents()
 
 void Server::run()
 {
+	std::cout << GREEN "Lancement du serveur..." RESET << std::endl;
 	initPoll();
 	while (g_running)
 	{
