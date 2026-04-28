@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/23 15:07:57 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/28 13:33:02 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <cstring>
 #include <arpa/inet.h>
+#include <cerrno>
 
 Server::Server() : _serverFd(-1)
 {
@@ -91,19 +92,35 @@ bool Server::initServer()
 	return (true);
 }
 
+void Server::removeClient(int i)
+{
+	close(_fds[i].fd);
+	_clients.erase(_fds[i].fd);
+	_fds.erase(_fds.begin() + i);
+}
+
 void Server::initPoll()
 {
 	pollfd server_poll_fd;
 	server_poll_fd.fd = _serverFd;
 	server_poll_fd.events = POLLIN;
+	server_poll_fd.revents = 0;
 	_fds.push_back(server_poll_fd);
 }
 
 bool Server::checkPoll()
 {
+	if (_fds.empty())
+		return (false);
+
 	int ret = poll(&_fds[0], _fds.size(), -1);
 	if (ret < 0)
 	{
+		if (errno == EINTR) // Need utility check (remettre errno a 0 apres ?)
+		{
+			std::cout << "EINTR" << std::endl;
+			return (true);
+		} // if block no util comment
 		std::cerr << "Erreur poll" << std::endl;
 		return (false);
 	}
@@ -127,6 +144,7 @@ void Server::acceptClient()
 	pollfd client_poll_fd;
 	client_poll_fd.fd = client_fd;
 	client_poll_fd.events = POLLIN;
+	client_poll_fd.revents = 0;
 	_fds.push_back(client_poll_fd);
 
 	_clients[client_fd] = Client(client_fd);
@@ -140,15 +158,13 @@ bool Server::handleClient(int i)
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer) - 1, 0);
 	if (bytes <= 0)
 	{
-		close(_fds[i].fd);
-		_clients.erase(_fds[i].fd);
-		_fds.erase(_fds.begin() + i);
+		removeClient(i);
 		return (true);
 	}
 	buffer[bytes] = '\0';
 	client.request += buffer;
 	std::cout << client.request << std::endl;
-
+	client.bytesSent = 0;
 	client.response =
 		"HTTP/1.1 200 OK\r\n"
 		"Content-Length: 5\r\n"
@@ -160,40 +176,61 @@ bool Server::handleClient(int i)
 	return (false);
 }
 
-void Server::sendResponse(int i)
+bool Server::sendResponse(int i)
 {
 	Client &client = _clients[_fds[i].fd];
 	
-	send(_fds[i].fd, client.response.c_str(), client.response.size(), 0);
+	size_t remaining = client.response.size() - client.bytesSent;
 	
-	close(_fds[i].fd);
-	_clients.erase(_fds[i].fd);
-	_fds.erase(_fds.begin() + i);
+	int ret = send(_fds[i].fd, client.response.c_str() + client.bytesSent, 
+		remaining, 0);
+	if (ret <= 0)
+	{
+		removeClient(i);
+		return (true);
+	}
+	client.bytesSent += ret;
+	
+	if (client.bytesSent >= client.response.size())
+	{
+		removeClient(i);
+		return (true);
+	}
+
+	return (false);
 }
 
-void Server::handleEvents()
+bool Server::handleEvents()
 {
 	for (int i = 0; i < (int)_fds.size(); i++)
 	{
 		if (_fds[i].fd == _serverFd)
 		{
+			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+			{
+				std::cerr << "Erreur sur le socket serveur" << std::endl;
+				return (false);
+			}
 			if (_fds[i].revents & POLLIN)
 				acceptClient();
 		}
 		else
 		{
 			bool removed = false;
-			if (_fds[i].revents & POLLIN)
-				removed = handleClient(i);
-			if (!removed && (_fds[i].revents & POLLOUT))
+			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
 			{
-				sendResponse(i);
+				removeClient(i);
 				removed = true;
 			}
+			if (!removed && (_fds[i].revents & POLLIN))
+				removed = handleClient(i);
+			if (!removed && (_fds[i].revents & POLLOUT))
+				removed = sendResponse(i);
 			if (removed)
 				i--;
 		}
 	}
+	return (true);
 }
 
 void Server::run()
@@ -203,6 +240,9 @@ void Server::run()
 	{
 		if (!checkPoll())
 			break;
-		handleEvents();
+		if (!handleEvents())
+			break;
 	}
+	close(_serverFd);
+	_serverFd = -1;
 }

@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/23 12:19:13 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/28 13:25:31 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,11 +44,12 @@ class Server
 		//------------ Methode privée ----------
 		void initPoll();
 		bool checkPoll();
-		void handleEvents();
+		bool handleEvents();
 		void acceptClient();
 		bool handleClient(int i);
-		void sendResponse(int i);
+		bool sendResponse(int i);
 		bool setSocketOption(int fd, int option);
+		void removeClient(int i);
 };
 
 #endif

@@ -22,31 +22,6 @@ fermeture
 C’est une étape très importante pour la suite.
 
 
-
-
-4. Passer d’un seul pollfd à plusieurs
-
-Pour l’instant tu surveilles seulement server_fd.
-
-À faire :
-
-utiliser un std::vector<pollfd>
-garder server_fd dedans
-ajouter chaque client_fd
-parcourir tous les fd après poll()
-
-Logique :
-
-server_fd avec POLLIN → accept
-client_fd avec POLLIN → recv
-client_fd avec POLLOUT → send
-
-Là tu commences à ressembler à un vrai webserv.
-
-
-
-
-
 5. Détecter la fin des headers HTTP
 
 Avant de parser proprement, il faut savoir quand la requête est complète.
@@ -60,8 +35,6 @@ Objectif :
 
 tant que \r\n\r\n n’est pas présent, la requête n’est pas complète
 après ça, tu peux commencer le parsing minimal
-
-
 
 
 

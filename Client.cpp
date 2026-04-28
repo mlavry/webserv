@@ -6,18 +6,18 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:46 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/23 11:32:31 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/27 13:46:43 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Client.hpp"
 
-Client::Client() : fd(-1)
+Client::Client() : fd(-1), bytesSent(0)
 {
 	
 }
 
-Client::Client(int _fd) : fd(_fd)
+Client::Client(int _fd) : fd(_fd), bytesSent(0)
 {
 	
 }
