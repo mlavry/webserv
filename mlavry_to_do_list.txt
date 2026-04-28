@@ -1,11 +1,6 @@
 
-
 Gérer ctrl + c et eviter que le programme se ferme brutalement 
 
 Faire message de fermeture serveur propre
 
 Faire aussi un message de lancement propre
-
-Gestion erreur send
-
-Reste event erreur poll	

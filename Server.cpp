@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/28 13:33:02 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/28 18:38:44 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,9 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <cerrno>
+#include <csignal>
+
+extern volatile sig_atomic_t g_running;
 
 Server::Server() : _serverFd(-1)
 {
@@ -40,6 +43,8 @@ bool Server::setSocketOption(int fd, int option)
 
 bool Server::initServer()
 {
+	//AF_INET IPv4
+	//SOCK_STREAM connexion TCP
 	_serverFd = socket(AF_INET, SOCK_STREAM, 0);
 	if (_serverFd < 0)
 	{
@@ -236,7 +241,7 @@ bool Server::handleEvents()
 void Server::run()
 {
 	initPoll();
-	while (true)
+	while (g_running)
 	{
 		if (!checkPoll())
 			break;
