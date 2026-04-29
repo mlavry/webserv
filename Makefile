@@ -4,7 +4,7 @@ CXX = c++
 
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98
 
-SRC = main.cpp Server.cpp Client.cpp
+SRC = srcs/main.cpp srcs/Server.cpp srcs/Client.cpp
 
 OBJ = $(SRC:.cpp=.o)
 
