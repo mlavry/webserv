@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/28 18:50:54 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/29 23:33:28 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,8 +66,8 @@ bool Server::initServer()
 
 	_serverAddress.sin_family = AF_INET;
 	_serverAddress.sin_port = htons(8082);
-	_serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");//htonl(INADDR_ANY);
-
+	//_serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");//htonl(INADDR_ANY);
+	_serverAddress.sin_addr.s_addr = inet_addr("0.0.0.0");
 	// On attache le socket a une adresse 
 	if (bind(_serverFd, (struct sockaddr *)&_serverAddress, 
 		sizeof(_serverAddress)) < 0)
@@ -162,6 +162,9 @@ void Server::acceptClient()
 bool Server::handleClient(int i)
 {
 	Client &client = _clients[_fds[i].fd];
+	
+											// Ajout parser Request
+
 	char buffer[1024];
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer) - 1, 0);
 	if (bytes <= 0)
@@ -169,9 +172,15 @@ bool Server::handleClient(int i)
 		removeClient(i);
 		return (true);
 	}
-	buffer[bytes] = '\0';
-	client.request += buffer;
-	std::cout << client.request << std::endl;
+	ClientRequest	NewRequest;
+	NewRequest.parse_chunk(buffer, bytes, client.request);				// Ajout parser Request
+	if (NewRequest.get_status() == COMPLETE)
+	{
+		return (false);
+	}
+	// buffer[bytes] = '\0';
+	// client.request += buffer;
+	// std::cout << client.request << std::endl;
 	client.bytesSent = 0;
 	client.response =
 		"HTTP/1.1 200 OK\r\n"

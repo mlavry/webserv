@@ -3,15 +3,17 @@
 /*                                                        :::      ::::::::   */
 /*   Client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:54 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/27 13:45:57 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/04/29 21:11:32 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef CLIENT_HPP
 # define CLIENT_HPP
+
+#include "Request.hpp"
 
 #include <string>
 #include <cstddef>
@@ -25,7 +27,7 @@ class Client
 
 		//----------- Variable publique ----------
 		int fd;
-		std::string request;
+		Request		request;	
 		std::string response;
 		size_t bytesSent;
 };
