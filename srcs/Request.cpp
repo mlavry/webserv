@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/04/29 21:26:27 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/05/05 16:34:14 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,13 +50,14 @@ void ClientRequest::parse_request_line(Request& request)
 		http_error_code = 400;
 		return ;
 	}
-	if (request.method != "GET" || request.method != "HEAD"
-		|| request.method != "POST" || request.method != "DELETE")
+	if (request.method != "GET" && request.method != "HEAD"
+		&& request.method != "POST" && request.method != "DELETE") //modif but don't correct the bug
 	{
 		status = ERROR;
 		http_error_code = 501;
 		return ;
 	}
+	status = READING_HEADER;
 }
 
 void			ClientRequest::parse_body(const char *body, size_t body_size, Request& request)
@@ -85,6 +86,7 @@ void			ClientRequest::parse_body(const char *body, size_t body_size, Request& re
 
 RequestState	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, Request& request)
 {
+	data.append(buffer, bytes_read);
 	if (status == READING_BODY && request.method == "POST")
 	{
 		parse_body(buffer, bytes_read, request);
@@ -95,16 +97,18 @@ RequestState	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, R
 	// 	parse_chunked_body(buffer, bytes_read, request);
 	// 	return (status);
 	// }
+	if (status == READING_REQUEST)
+	{
+		parse_request_line(request);
+		if (status == ERROR)
+			return (status);
+	}
 	
 	if (status == READING_HEADER && !request.method.empty())
 	{
 		parse_headers(request);
-		return(status);
-	}
-	if (status == READING_REQUEST)
-	{
-		parse_request_line(request);
-		return (status);
+		if (status == ERROR)
+			return (status);
 	}
 
 	if (status == COMPLETE)

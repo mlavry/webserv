@@ -3,15 +3,20 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/29 23:33:28 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/05/05 16:26:50 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#define GREEN "\033[32m"
-#define RESET "\033[0m"
+#define GREEN	"\033[32m"
+#define RED		"\033[31m"
+#define RESET	"\033[0m"
+#define YELLOW	"\033[33m"
+#define BLUE	"\033[34m"
+#define CYAN	"\033[36m"
+#define BOLD	"\033[1m"
 
 #include "Server.hpp"
 
@@ -22,6 +27,7 @@
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>
+#include <ctime>
 
 extern volatile sig_atomic_t g_running;
 
@@ -42,6 +48,34 @@ bool Server::setSocketOption(int fd, int option)
 	if (setsockopt(fd, SOL_SOCKET, option, &opt, sizeof(opt)) < 0)
 		return (false);
 	return (true);
+}
+
+std::string Server::getTime() const
+{
+	std::time_t now;
+	char buffer[64];
+	
+	now = std::time(NULL);
+	std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", 
+		std::localtime(&now));
+	return (buffer);
+}
+
+std::string Server::methodColor(const std::string& method) const
+{
+	if (method == "GET")
+		return (GREEN);
+	else if (method == "POST")
+		return (YELLOW);
+	else if (method == "DELETE")
+		return (RED);
+	return (CYAN);
+}
+
+void Server::printLog(const Client& client) const
+{
+	(void)client;
+	std::cout << getTime() << " test: " << client.fd << std::endl;
 }
 
 bool Server::initServer()
@@ -135,9 +169,22 @@ bool Server::checkPoll()
 	return (true);
 }
 
+/*std::string Server::ipToString(unsigned int ip) const
+{
+	std::ostringstream oss;
+	
+	ip = ntohl(ip) // Network to host long 
+
+	
+}*/
+
 void Server::acceptClient()
 {
-	int client_fd = accept(_serverFd, NULL, NULL);
+	sockaddr_in client_addr;
+	socklen_t client_len = sizeof(client_addr);
+	
+	int client_fd = accept(_serverFd, (struct sockaddr *)&client_addr,
+		&client_len);
 	if (client_fd < 0)
 		return;
 
@@ -148,7 +195,7 @@ void Server::acceptClient()
 		close(client_fd);
 		return;
 	}
-				
+
 	pollfd client_poll_fd;
 	client_poll_fd.fd = client_fd;
 	client_poll_fd.events = POLLIN;
@@ -162,25 +209,36 @@ void Server::acceptClient()
 bool Server::handleClient(int i)
 {
 	Client &client = _clients[_fds[i].fd];
-	
-											// Ajout parser Request
-
+	RequestState state;
 	char buffer[1024];
-	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer) - 1, 0);
+
+	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer), 0);
 	if (bytes <= 0)
 	{
 		removeClient(i);
 		return (true);
 	}
-	ClientRequest	NewRequest;
-	NewRequest.parse_chunk(buffer, bytes, client.request);				// Ajout parser Request
-	if (NewRequest.get_status() == COMPLETE)
+
+	state = client.parser.parse_chunk(buffer, bytes, client.request);
+
+	std::cout << client.parser.get_error_code() << std::endl;
+	std::cout << "status: " << state << std::endl;
+	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
 	{
+		client.response = "HTTP/1.1 400 Bad Request\r\n"
+			"Content-Length: 11\r\n"
+			"Connection: close\r\n"
+			"\r\n"
+			"Bad Request";
+		client.bytesSent = 0;
+		printLog(client);
+		_fds[i].events = POLLOUT;
 		return (false);
 	}
-	// buffer[bytes] = '\0';
-	// client.request += buffer;
-	// std::cout << client.request << std::endl;
+	
+	if (state != COMPLETE)
+		return (false);
+
 	client.bytesSent = 0;
 	client.response =
 		"HTTP/1.1 200 OK\r\n"
@@ -189,6 +247,7 @@ bool Server::handleClient(int i)
 		"Connection: close\r\n"
 		"\r\n"
 		"Hello";
+	printLog(client);
 	_fds[i].events = POLLOUT;
 	return (false);
 }

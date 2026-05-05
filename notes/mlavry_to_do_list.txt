@@ -1,2 +1,3 @@
 
-vide
+faire un log style NGINX avec IP + status code + temps de réponse
+(check fonction)

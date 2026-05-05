@@ -6,19 +6,21 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/04/28 13:25:31 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/05 13:52:21 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
+#include "Client.hpp"
+
 #include <vector>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <map>
-#include "Client.hpp"
+#include <string>
 
 class Server
 {
@@ -50,6 +52,10 @@ class Server
 		bool sendResponse(int i);
 		bool setSocketOption(int fd, int option);
 		void removeClient(int i);
+		std::string methodColor(const std::string& method) const;
+		void printLog(const Client& client) const;
+		std::string getTime() const;
+		std::string ipToString(unsigned int ip) const;
 };
 
 #endif
