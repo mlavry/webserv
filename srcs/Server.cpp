@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/05 16:26:50 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/05 17:36:14 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,6 +28,7 @@
 #include <cerrno>
 #include <csignal>
 #include <ctime>
+#include <sstream>
 
 extern volatile sig_atomic_t g_running;
 
@@ -74,8 +75,7 @@ std::string Server::methodColor(const std::string& method) const
 
 void Server::printLog(const Client& client) const
 {
-	(void)client;
-	std::cout << getTime() << " test: " << client.fd << std::endl;
+	std::cout << getTime() << "Ip: " << client.ip << " test: " << client.fd << std::endl;
 }
 
 bool Server::initServer()
@@ -169,14 +169,19 @@ bool Server::checkPoll()
 	return (true);
 }
 
-/*std::string Server::ipToString(unsigned int ip) const
+std::string Server::ipToString(unsigned int ip) const
 {
 	std::ostringstream oss;
 	
-	ip = ntohl(ip) // Network to host long 
+	ip = ntohl(ip); // Network to host long 
 
+	oss << ((ip >> 24) & 0xFF) << "."
+		<< ((ip >> 16) & 0xFF) << "."
+		<< ((ip >> 8) & 0xFF) << "."
+		<< (ip & 0xFF);
 	
-}*/
+	return (oss.str());
+}
 
 void Server::acceptClient()
 {
@@ -203,6 +208,7 @@ void Server::acceptClient()
 	_fds.push_back(client_poll_fd);
 
 	_clients[client_fd] = Client(client_fd);
+	_clients[client_fd].ip = ipToString(client_addr.sin_addr.s_addr);
 	std::cout << "Client ajouté dans poll" << std::endl;
 }
 
