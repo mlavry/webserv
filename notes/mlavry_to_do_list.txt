@@ -1,3 +1,5 @@
 
-faire un log style NGINX avec IP + status code + temps de réponse
-(check fonction)
+Ameliorer log ?
+	-taille du body
+	-code HTTP stylé
+	-alignement parfait façon NGINX

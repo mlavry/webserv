@@ -6,17 +6,21 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/05 17:36:14 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/06 12:58:02 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#define GREEN	"\033[32m"
-#define RED		"\033[31m"
-#define RESET	"\033[0m"
-#define YELLOW	"\033[33m"
-#define BLUE	"\033[34m"
-#define CYAN	"\033[36m"
-#define BOLD	"\033[1m"
+#define RESET   "\033[0m"
+#define BOLD    "\033[1m"
+#define DIM     "\033[2m"
+
+#define RED     "\033[31m"
+#define GREEN   "\033[32m"
+#define YELLOW  "\033[33m"
+#define BLUE    "\033[34m"
+#define MAGENTA "\033[35m"
+#define CYAN    "\033[36m"
+#define WHITE   "\033[37m"
 
 #include "Server.hpp"
 
@@ -29,6 +33,7 @@
 #include <csignal>
 #include <ctime>
 #include <sstream>
+#include <iomanip>
 
 extern volatile sig_atomic_t g_running;
 
@@ -59,7 +64,17 @@ std::string Server::getTime() const
 	now = std::time(NULL);
 	std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", 
 		std::localtime(&now));
-	return (buffer);
+	return (std::string(buffer));
+}
+
+double Server::getResponseTime(const Client& client) const
+{
+	if (client.startTime == 0)
+		return (0.0);
+	
+	clock_t end = std::clock();
+	
+	return ((double)(end - client.startTime) * 1000.0 / CLOCKS_PER_SEC);
 }
 
 std::string Server::methodColor(const std::string& method) const
@@ -70,12 +85,66 @@ std::string Server::methodColor(const std::string& method) const
 		return (YELLOW);
 	else if (method == "DELETE")
 		return (RED);
-	return (CYAN);
+	else if (method == "HEAD")
+		return (CYAN);
+	return (WHITE);
+}
+
+std::string Server::statusColor(int status) const
+{
+	if (status >= 200 && status < 300)
+		return (GREEN);
+	if (status >= 300 && status < 400)
+		return (CYAN);
+	if (status >= 400 && status < 500)
+		return (YELLOW);
+	if (status >= 500)
+		return (RED);
+	return (WHITE);
+}
+
+std::string Server::truncString(const std::string& str, size_t max) const
+{
+	if (str.size() <= max)
+		return (str);
+	if (max <= 3)
+		return (str.substr(0, max));
+	return (str.substr(0, max - 3) + "...");
 }
 
 void Server::printLog(const Client& client) const
 {
-	std::cout << getTime() << "Ip: " << client.ip << " test: " << client.fd << std::endl;
+	double response_time = getResponseTime(client);
+	std::string method = truncString(client.request.method, 6);
+	std::string path = truncString(client.request.path, 16);
+
+	std::cout
+		<< BOLD << BLUE << "● " << RESET
+		<< DIM << getTime() << RESET
+		<< " │ "
+		<< CYAN << std::left << std::setw(15)
+		<< client.ip << RESET
+		<< " │ "
+		<< DIM << "fd:" << std::left << std::setw(4)
+		<< client.fd << RESET
+		<< " │ "
+		<< methodColor(client.request.method)
+		<< BOLD << std::left << std::setw(6)
+		<< method << RESET
+		<< " "
+		<< std::left << std::setw(24)
+		<< path
+		<< " │ "
+		<< statusColor(client.parser.get_error_code())
+		<< BOLD << std::setw(3)
+		<< client.parser.get_error_code() << RESET
+		<< " │ "
+		<< std::right << std::setw(5)
+		<< client.response.size() << "B"
+		<< " │ "
+		<< std::fixed << std::setprecision(2)
+		<< response_time << "ms"
+		<< std::endl;
 }
 
 bool Server::initServer()
@@ -225,10 +294,11 @@ bool Server::handleClient(int i)
 		return (true);
 	}
 
+	if (client.startTime == 0)
+		client.startTime = std::clock();
 	state = client.parser.parse_chunk(buffer, bytes, client.request);
-
-	std::cout << client.parser.get_error_code() << std::endl;
-	std::cout << "status: " << state << std::endl;
+	//std::cout << client.parser.get_error_code() << std::endl;
+	//std::cout << "status: " << state << std::endl;
 	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
 	{
 		client.response = "HTTP/1.1 400 Bad Request\r\n"
