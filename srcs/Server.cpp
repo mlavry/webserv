@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/06 12:58:02 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/12 15:19:40 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,8 @@
 #define MAGENTA "\033[35m"
 #define CYAN    "\033[36m"
 #define WHITE   "\033[37m"
+
+#define DEFAULT_TIMEOUT 30
 
 #include "Server.hpp"
 
@@ -46,6 +48,13 @@ Server::~Server()
 {
 	if (_serverFd >= 0)
 		close(_serverFd);
+}
+
+ServerConfig::ServerConfig()
+{
+	headerTimeout = DEFAULT_TIMEOUT;
+	bodyTimeout = DEFAULT_TIMEOUT;
+	sendTimeout = DEFAULT_TIMEOUT;
 }
 
 bool Server::setSocketOption(int fd, int option)
@@ -139,8 +148,8 @@ void Server::printLog(const Client& client) const
 		<< BOLD << std::setw(3)
 		<< client.parser.get_error_code() << RESET
 		<< " │ "
-		<< std::right << std::setw(5)
-		<< client.response.size() << "B"
+		<< std::right << std::setw(5) << GREEN
+		<< client.response.size() << "B" << RESET
 		<< " │ "
 		<< std::fixed << std::setprecision(2)
 		<< response_time << "ms"

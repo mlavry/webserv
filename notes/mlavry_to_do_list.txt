@@ -1,5 +1,18 @@
+Timeout mis en place a moitié
+	- J'ai besoin de la requete finale avant de mettre en place le timeout fini
+	(update status incorrect pour le moment)
 
-Ameliorer log ?
-	-taille du body
-	-code HTTP stylé
-	-alignement parfait façon NGINX
+----- A tester ensuite -----
+
+Gérer les premières réponses utiles
+
+Avant les fichiers, fais quelques statuts propres.
+
+À faire :
+
+200 OK
+400 Bad Request
+404 Not Found
+405 Method Not Allowed
+
+Le sujet insiste sur des codes de statut corrects

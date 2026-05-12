@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/06 12:25:14 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/12 15:08:02 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,15 @@
 #include <poll.h>
 #include <map>
 #include <string>
+
+struct ServerConfig
+{
+	int headerTimeout;
+	int bodyTimeout;
+	int sendTimeout;
+
+	ServerConfig();
+};
 
 class Server
 {
@@ -38,6 +47,9 @@ class Server
 		sockaddr_in _serverAddress;
 		std::vector<pollfd> _fds;
 		std::map<int, Client> _clients;
+		
+		//------------ Variable (config) ----------
+		ServerConfig _config;
 		
 		//------------ Forme canonique ----------
 		Server(const Server& other);
