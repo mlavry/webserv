@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/14 17:43:42 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/14 23:11:00 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -295,41 +295,46 @@ bool Server::handleClient(int i)
 	char buffer[1024];
 
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer), 0);
-	std::cout << "data received" << std::endl;
+
 	if (bytes < 0)
 	{
 		std::cout << "recv < 0 bytes" << std::endl;
 		removeClient(i);
 		return (true);
 	}
-	else if (bytes == 0)
+	else if (bytes > 0)
+	{
+		//std::cout << "data received" << std::endl;
+		client.lastActivity = std::time(NULL);
+		if (!client.hasStartTime)
+		{
+			client.startTime = std::time(NULL);
+			client.hasStartTime = true;
+		}
+		client.parser.parse_chunk(buffer, bytes, client.request);
+	}
+	//std::cout << client.parser.get_error_code() << std::endl;
+	//std::cout << "status: " << state << std::endl;
+
+	state = client.parser.get_status();
+
+	//std::cout << "state: " << state
+	//	<< " method: [" << client.request.method << "]"
+	//	<< " path: [" << client.request.path << "]"
+	//	<< " error: " << client.parser.get_error_code()
+	//	<< std::endl;
+	
+	if (bytes == 0)
 	{
 		std::cout << "recv = 0 bytes" << std::endl;
-		if (client.parser.get_status() != COMPLETE)
+		if (state != COMPLETE)
 		{
 			std::cout << "status != COMPLETE" << std::endl;
 			removeClient(i);
 			return (true);
 		}
-	}
-
-	client.lastActivity = std::time(NULL);
-	if (!client.hasStartTime)
-	{
-		client.startTime = std::time(NULL);
-		client.hasStartTime = true;
-	}
+	}	
 		
-	client.parser.parse_chunk(buffer, bytes, client.request);
-	//std::cout << client.parser.get_error_code() << std::endl;
-	//std::cout << "status: " << state << std::endl;
-	state = client.parser.get_status();
-
-	std::cout << "state: " << state
-		<< " method: [" << client.request.method << "]"
-		<< " path: [" << client.request.path << "]"
-		<< " error: " << client.parser.get_error_code()
-		<< std::endl;
 	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
 	{
 		client.response = "HTTP/1.1 400 Bad Request\r\n"

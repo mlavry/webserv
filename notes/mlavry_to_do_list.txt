@@ -31,3 +31,7 @@ Le sujet insiste sur des codes de statut corrects
 - Corriger bytes == 0 et on parse_chunk quand meme 
 
 - Le test 3 ne passe toujours pas (probleme requete ?) 
+
+- Ne pas oublier de re tester sur linux une fois patch 
+
+- modif log ERROR
