@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/13 19:29:21 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/14 17:43:42 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,12 +50,12 @@ Server::~Server()
 		close(_serverFd);
 }
 
-/*ServerConfig::ServerConfig()
+TimeoutConfig::TimeoutConfig()
 {
 	headerTimeout = DEFAULT_TIMEOUT;
 	bodyTimeout = DEFAULT_TIMEOUT;
 	sendTimeout = DEFAULT_TIMEOUT;
-}*/
+}
 
 bool Server::setSocketOption(int fd, int option)
 {
@@ -78,12 +78,10 @@ std::string Server::getTime() const
 
 double Server::getResponseTime(const Client& client) const
 {
-	if (client.startTime == 0)
+	if (!client.hasStartTime)
 		return (0.0);
 	
-	clock_t end = std::clock();
-	
-	return ((double)(end - client.startTime) * 1000.0 / CLOCKS_PER_SEC);
+	return (std::difftime(std::time(NULL), client.startTime));
 }
 
 std::string Server::methodColor(const std::string& method) const
@@ -152,7 +150,7 @@ void Server::printLog(const Client& client) const
 		<< client.response.size() << "B" << RESET
 		<< " │ "
 		<< std::fixed << std::setprecision(2)
-		<< response_time << "ms"
+		<< response_time << "s"
 		<< std::endl;
 }
 
@@ -298,18 +296,40 @@ bool Server::handleClient(int i)
 
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer), 0);
 	std::cout << "data received" << std::endl;
-	if (bytes <= 0)
+	if (bytes < 0)
 	{
+		std::cout << "recv < 0 bytes" << std::endl;
 		removeClient(i);
 		return (true);
 	}
+	else if (bytes == 0)
+	{
+		std::cout << "recv = 0 bytes" << std::endl;
+		if (client.parser.get_status() != COMPLETE)
+		{
+			std::cout << "status != COMPLETE" << std::endl;
+			removeClient(i);
+			return (true);
+		}
+	}
 
-	if (client.startTime == 0)
-		client.startTime = std::clock();
+	client.lastActivity = std::time(NULL);
+	if (!client.hasStartTime)
+	{
+		client.startTime = std::time(NULL);
+		client.hasStartTime = true;
+	}
+		
 	client.parser.parse_chunk(buffer, bytes, client.request);
 	//std::cout << client.parser.get_error_code() << std::endl;
 	//std::cout << "status: " << state << std::endl;
 	state = client.parser.get_status();
+
+	std::cout << "state: " << state
+		<< " method: [" << client.request.method << "]"
+		<< " path: [" << client.request.path << "]"
+		<< " error: " << client.parser.get_error_code()
+		<< std::endl;
 	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
 	{
 		client.response = "HTTP/1.1 400 Bad Request\r\n"
@@ -381,8 +401,9 @@ bool Server::handleEvents()
 		else
 		{
 			bool removed = false;
-			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+			if (_fds[i].revents & (POLLERR | POLLNVAL))
 			{
+				//std::cout << "Caught POLLHUP or other" << std::endl;
 				removeClient(i);
 				removed = true;
 			}
@@ -390,6 +411,12 @@ bool Server::handleEvents()
 				removed = handleClient(i);
 			if (!removed && (_fds[i].revents & POLLOUT))
 				removed = sendResponse(i);
+			if (!removed && (_fds[i].revents & POLLHUP)
+				&& !(_fds[i].events & POLLOUT))
+			{
+				removeClient(i);
+				removed = true;
+			}
 			if (removed)
 				i--;
 		}

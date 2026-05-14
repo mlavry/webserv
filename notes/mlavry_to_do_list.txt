@@ -16,3 +16,18 @@ Avant les fichiers, fais quelques statuts propres.
 405 Method Not Allowed
 
 Le sujet insiste sur des codes de statut corrects
+
+
+---- Correct -----
+
+- Mise en place time_t pour le temps de reponse (plus parlant)
+
+- Mise en place plus propre des Timeout
+
+- Stocker le status directement dans Client 
+
+- Mettre code 200 meme si reponse statique 
+
+- Corriger bytes == 0 et on parse_chunk quand meme 
+
+- Le test 3 ne passe toujours pas (probleme requete ?) 

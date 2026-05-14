@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/13 19:28:50 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/14 13:45:23 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,14 +22,14 @@
 #include <map>
 #include <string>
 
-/*struct ServerConfig
+struct TimeoutConfig
 {
 	int headerTimeout;
 	int bodyTimeout;
 	int sendTimeout;
 
-	ServerConfig();
-};*/
+	TimeoutConfig();
+};
 
 class Server
 {
@@ -48,8 +48,8 @@ class Server
 		std::vector<pollfd> _fds;
 		std::map<int, Client> _clients;
 		
-		//------------ Variable (config) ----------
-		//ServerConfig _config;
+		//------------ Variable (timeout config) ----------
+		TimeoutConfig _config;
 		
 		//------------ Forme canonique ----------
 		Server(const Server& other);

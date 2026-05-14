@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:54 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/05 13:02:25 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/14 14:07:15 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,7 +33,10 @@ class Client
 		std::string response;
 		size_t bytesSent;
 
-		clock_t startTime;
+		bool hasStartTime;
+		time_t startTime;
+		time_t lastActivity;
+
 		std::string ip;
 };
 
