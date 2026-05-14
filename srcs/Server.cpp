@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/12 15:19:40 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/13 19:29:21 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,12 +50,12 @@ Server::~Server()
 		close(_serverFd);
 }
 
-ServerConfig::ServerConfig()
+/*ServerConfig::ServerConfig()
 {
 	headerTimeout = DEFAULT_TIMEOUT;
 	bodyTimeout = DEFAULT_TIMEOUT;
 	sendTimeout = DEFAULT_TIMEOUT;
-}
+}*/
 
 bool Server::setSocketOption(int fd, int option)
 {
@@ -297,6 +297,7 @@ bool Server::handleClient(int i)
 	char buffer[1024];
 
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer), 0);
+	std::cout << "data received" << std::endl;
 	if (bytes <= 0)
 	{
 		removeClient(i);
@@ -305,9 +306,10 @@ bool Server::handleClient(int i)
 
 	if (client.startTime == 0)
 		client.startTime = std::clock();
-	state = client.parser.parse_chunk(buffer, bytes, client.request);
+	client.parser.parse_chunk(buffer, bytes, client.request);
 	//std::cout << client.parser.get_error_code() << std::endl;
 	//std::cout << "status: " << state << std::endl;
+	state = client.parser.get_status();
 	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
 	{
 		client.response = "HTTP/1.1 400 Bad Request\r\n"
@@ -332,6 +334,7 @@ bool Server::handleClient(int i)
 		"Connection: close\r\n"
 		"\r\n"
 		"Hello";
+	client.request.print_body();
 	printLog(client);
 	_fds[i].events = POLLOUT;
 	return (false);

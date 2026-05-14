@@ -3,18 +3,18 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/05/05 16:34:14 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/12 17:34:56 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Request.hpp"
 #include <cstdlib>
 #include <cerrno>
-#include <sstream>
 #include <iostream>
+#include <sstream>
 #include <limits.h>
 
 ClientRequest::ClientRequest()
@@ -24,11 +24,22 @@ ClientRequest::ClientRequest()
 	body_bytes_readed = 0;
 	file_fd = -1;
 	http_error_code = 0;
+	current_data_size = 0;
+	current_data_size_readed = 0;
+	reading_data_chunked = false;
+	crlf_received = false;
 }
 
 ClientRequest::~ClientRequest()
 {
 	
+}
+
+void Request::print_body() const
+{
+	if (!body.empty())
+		std::cout.write(body.data(), body.size());
+	std::cout << std::endl;
 }
 
 void ClientRequest::parse_request_line(Request& request)
@@ -37,14 +48,17 @@ void ClientRequest::parse_request_line(Request& request)
 	std::string	line;
 
 	request_length = data.find("\r\n");
+	if (request_length == std::string::npos)
+		return ;
 	line = data.substr(0, request_length);
 	
 	// we extracted the request and we now erase it so it will start from the header (+ 2 for the \r\n);
 	data.erase(0, request_length + 2);
 	std::istringstream	iss(line);
-
+	std::string			extra;
 	iss >> request.method >> request.path >> request.http_version;
-	if (request.method.empty() || request.path.empty() || request.http_version.empty())
+	if (request.method.empty() || request.path.empty()
+	|| request.http_version.empty() || (iss >> extra))
 	{
 		status = ERROR;
 		http_error_code = 400;
@@ -57,10 +71,16 @@ void ClientRequest::parse_request_line(Request& request)
 		http_error_code = 501;
 		return ;
 	}
+	if (request.http_version != "HTTP/1.1")
+	{
+		status = ERROR;
+		set_error_code(505);
+		return ;
+	}
 	status = READING_HEADER;
 }
 
-void			ClientRequest::parse_body(const char *body, size_t body_size, Request& request)
+void			ClientRequest::parse_body(Request& request)
 {
 	/*
 	if (!is_available_method_with_path(request.method, request.path)) 
@@ -69,53 +89,174 @@ void			ClientRequest::parse_body(const char *body, size_t body_size, Request& re
 		set_error_code(405);
 	}
 	*/
+	size_t bytes_to_read;
 
-	size_t bytes_to_read = body_size;
-    
-    if (body_bytes_readed + body_size > content_length)
+	if (body_bytes_readed > content_length)
+	{
+		set_error_code(400);
+		status = ERROR;
+		return ;
+	}
+    if (body_bytes_readed == content_length)
 	{	
-        bytes_to_read = content_length - body_bytes_readed;
+        status = COMPLETE;
+		return ;
     }
+	
+	bytes_to_read = content_length - body_bytes_readed;
+	
+	if (data.size() < bytes_to_read)
+		bytes_to_read = data.size();
 
-	request.body.insert(request.body.end(), body, body + bytes_to_read);
-
+	request.body.insert(request.body.end(), data.begin(), data.begin() + bytes_to_read);
+	data.erase(0, bytes_to_read);
 	body_bytes_readed += bytes_to_read;
-	if (body_bytes_readed >= content_length)
+	if (body_bytes_readed == content_length)
 		status = COMPLETE;
 }
 
-RequestState	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, Request& request)
+long	ClientRequest::get_chunk_size(const std::string& hex_size)
 {
-	data.append(buffer, bytes_read);
-	if (status == READING_BODY && request.method == "POST")
-	{
-		parse_body(buffer, bytes_read, request);
-		return (status);
-	}
-	// else if (status == READING_CHUNKED && request.method == "POST")
-	// {
-	// 	parse_chunked_body(buffer, bytes_read, request);
-	// 	return (status);
-	// }
-	if (status == READING_REQUEST)
-	{
-		parse_request_line(request);
-		if (status == ERROR)
-			return (status);
-	}
+	if (hex_size == "WAIT")
+		return (-2);
 	
-	if (status == READING_HEADER && !request.method.empty())
+	if (hex_size.empty())
 	{
-		parse_headers(request);
-		if (status == ERROR)
-			return (status);
+		status = ERROR;
+		set_error_code(400);
+		return (-1);
 	}
 
-	if (status == COMPLETE)
-		return (status);
-	if (status == ERROR)
-		return (status);
-	return (TIME_OUT);
+	if (!std::isxdigit(static_cast<unsigned char>(hex_size[0])))
+	{
+		status = ERROR;
+		set_error_code(400);
+		return (-1);
+	}
+	long	size;
+	char	*end;
+
+	size = strtol(hex_size.c_str(), &end, 16);
+	if (size < 0 || (*end != '\0' && *end != ';'))
+	{
+		status = ERROR;
+		set_error_code(400);
+		return (-1);
+	}
+	return (size);
+}
+
+std::string	ClientRequest::extract_chunk_size()
+{
+	size_t	end_of_line = data.find("\r\n");
+	
+	if (end_of_line == std::string::npos)
+		return ("WAIT");
+	
+	std::string	hex_size = data.substr(0, end_of_line);
+	data.erase(0, end_of_line + 2);
+	return (hex_size);
+}
+
+int	ClientRequest::is_crlf_correct(int code)
+{
+	if (data.size() < 2)
+		return (0);
+
+	if (data[0] != '\r' || data[1] != '\n')
+	{
+		set_error_code(400);
+		status = ERROR;
+		return (-1);
+	}
+
+	data.erase(0, 2);
+
+	current_data_size = 0;
+	current_data_size_readed = 0;
+	reading_data_chunked = false;
+
+	if (code == 0)
+	{
+		crlf_received = false;
+		status = COMPLETE;
+	}
+
+	return (1);
+}
+
+void	ClientRequest::parse_chunked_body(Request& request)
+{
+	while (status == READING_CHUNKED)
+	{
+		if (crlf_received)
+		{
+			is_crlf_correct(0);
+			return ;
+		}
+
+		if (!reading_data_chunked)
+		{
+			long size = get_chunk_size(extract_chunk_size());
+
+			if (size < 0)
+				return ;
+
+			if (size == 0)
+			{
+				crlf_received = true;
+				continue ;
+			}
+
+			current_data_size = static_cast<size_t>(size);
+			current_data_size_readed = 0;
+			reading_data_chunked = true;
+		}
+
+		if (reading_data_chunked)
+		{
+			if (data.size() < current_data_size + 2)
+				return ;
+
+			request.body.insert(
+				request.body.end(),
+				data.begin(),
+				data.begin() + current_data_size
+			);
+
+			data.erase(0, current_data_size);
+
+			if (is_crlf_correct(1) <= 0)
+				return ;
+		}
+	}
+}
+
+void	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, Request& request)
+{
+	if (buffer && bytes_read > 0)
+		data.append(buffer, bytes_read);
+
+	while (!data.empty() && status != COMPLETE && status != ERROR)
+	{
+		if (status == READING_REQUEST)
+			parse_request_line(request);
+		if (status == READING_HEADER)
+			parse_headers(request);
+		if (status == READING_BODY)
+			parse_body(request);
+		if (status == READING_CHUNKED)
+			parse_chunked_body(request);
+
+		if (status == READING_REQUEST)
+			break ;
+		if (status == READING_HEADER && data.find("\r\n\r\n") == std::string::npos)
+			break ;
+		if (status == READING_BODY && data.empty())
+			break ;
+		if (status == READING_CHUNKED && data.empty())
+			break ;
+	}
 }
 
 void				ClientRequest::set_error_code(int code_error)
@@ -185,8 +326,6 @@ int ClientRequest::is_valid_size(const std::string& str, int code)
 void ClientRequest::parse_headers(Request& request)
 {
 	size_t	end_of_line;
-	status = READING_HEADER;
-	int		as_content_size = 0;
 
 	while ((end_of_line = data.find("\r\n")) != std::string::npos)
 	{
@@ -195,28 +334,40 @@ void ClientRequest::parse_headers(Request& request)
 
 		if (line.empty())
 		{
-			if (request.header.find("Content-Length") != request.header.end())
+			bool has_content_length = request.header.find("Content-Length") != request.header.end();
+			bool has_transfer_encoding = request.header.find("Transfer-Encoding") != request.header.end();
+			
+			if (has_content_length && has_transfer_encoding)
 			{
-				int i = is_valid_size(request.header["Content-Length"], 0);
-				if (i < 0)
-					return ;
-				status = READING_BODY;
-				content_length = i;
-				as_content_size++;
+				set_error_code(400);
+				status = ERROR;
+				return ;
 			}
-			else if (request.header.find("Transfer-Encoding") != request.header.end())
+			if (has_content_length)
+			{
+				int	size = is_valid_size(request.header["Content-Length"], 0);
+				if (size < 0)
+					return ;
+				
+				content_length = static_cast<size_t>(size);
+				if (content_length == 0)
+					status = COMPLETE;
+				else
+					status = READING_BODY;
+				return ;
+			}
+			if (has_transfer_encoding)
 			{
 				if (is_valid_size(request.header["Transfer-Encoding"], 1) < 0)
-					return ;
+					return;
 				status = READING_CHUNKED;
-				as_content_size++;
+				return ;
 			}
-			else
-				status = COMPLETE;
+			status = COMPLETE;
 			return ;
 		}
 		size_t	key_pos = line.find(':');
-		if (key_pos != line.npos)
+		if (key_pos != std::string::npos && key_pos != 0)
 		{
 			std::string key = line.substr(0, key_pos);
 			std::string value = line.substr(key_pos + 1);
@@ -232,12 +383,5 @@ void ClientRequest::parse_headers(Request& request)
 			set_error_code(400);
 			return ;
 		}
-	}
-	// this is requiered to check if header have both Content-Length and Transfer-Encoding in the same header
-	if (as_content_size > 1)
-	{
-		status = ERROR;
-		set_error_code(400);
-		return ;
 	}
 }
