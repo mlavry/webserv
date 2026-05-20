@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/14 13:45:23 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/20 17:20:11 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,9 +53,8 @@ class Server
 		
 		//------------ Forme canonique ----------
 		Server(const Server& other);
-		Server& operator=(const Server& other);
 
-		//------------ Methode privée ----------
+		//------------ Methode server principale ----------
 		void initPoll();
 		bool checkPoll();
 		bool handleEvents();
@@ -64,6 +63,7 @@ class Server
 		bool sendResponse(int i);
 		bool setSocketOption(int fd, int option);
 		void removeClient(int i);
+		void checkTimeouts();
 		
 		//------------ Methode logger ----------
 		std::string methodColor(const std::string& method) const;
@@ -73,6 +73,11 @@ class Server
 		std::string statusColor(int status) const;
 		std::string truncString(const std::string& str, size_t max) const;
 		double getResponseTime(const Client& client) const;
+
+		//------------ Methode Timeout ----------
+		int getTimeoutClient(const Client& client, short events) const;
+		std::string buildTimeoutResponse() const;
+		bool handleTimeout(int i);
 };
 
 #endif

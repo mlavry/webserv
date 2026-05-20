@@ -277,7 +277,6 @@ Note :
 Commande :
 
 printf "PATCH / HTTP/1.1\r\nHost: 127.0.0.1:8082\r\n\r\n" | nc -w 5 127.0.0.1 8082
-
 Objectif :
 - Vérifier que le parser refuse une méthode non supportée.
 
@@ -460,3 +459,12 @@ printf "PATCH / HTTP/1.1\r\nHost: 127.0.0.1:8082\r\n\r\n" | nc -w 5 127.0.0.1 80
 printf "GET / HTTP/1.1\r\n" | nc -w 5 127.0.0.1 8082
 
 ============================================================
+
+
+Timeout test
+
+(
+	printf "GET / HTTP/1.1\r\n"
+	sleep 40
+) | nc -w 45 127.0.0.1 8082
+

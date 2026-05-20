@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:54 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/14 14:07:15 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/15 12:28:42 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ class Client
 		time_t startTime;
 		time_t lastActivity;
 
+		int statusCode;
 		std::string ip;
 };
 

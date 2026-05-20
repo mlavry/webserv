@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/14 23:11:00 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/20 17:52:36 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,9 @@
 #define CYAN    "\033[36m"
 #define WHITE   "\033[37m"
 
-#define DEFAULT_TIMEOUT 30
+#define HEADER_TIMEOUT 30
+#define BODY_TIMEOUT 30
+#define SEND_TIMEOUT 30
 
 #include "Server.hpp"
 
@@ -52,9 +54,9 @@ Server::~Server()
 
 TimeoutConfig::TimeoutConfig()
 {
-	headerTimeout = DEFAULT_TIMEOUT;
-	bodyTimeout = DEFAULT_TIMEOUT;
-	sendTimeout = DEFAULT_TIMEOUT;
+	headerTimeout = HEADER_TIMEOUT;
+	bodyTimeout = BODY_TIMEOUT;
+	sendTimeout = SEND_TIMEOUT;
 }
 
 bool Server::setSocketOption(int fd, int option)
@@ -142,9 +144,9 @@ void Server::printLog(const Client& client) const
 		<< std::left << std::setw(24)
 		<< path
 		<< " │ "
-		<< statusColor(client.parser.get_error_code())
+		<< statusColor(client.statusCode)
 		<< BOLD << std::setw(3)
-		<< client.parser.get_error_code() << RESET
+		<< client.statusCode << RESET
 		<< " │ "
 		<< std::right << std::setw(5) << GREEN
 		<< client.response.size() << "B" << RESET
@@ -231,7 +233,7 @@ bool Server::checkPoll()
 	if (_fds.empty())
 		return (false);
 
-	int ret = poll(&_fds[0], _fds.size(), -1);
+	int ret = poll(&_fds[0], _fds.size(), 1000); // 1000 (every second server check activity)
 	if (ret < 0)
 	{
 		if (errno == EINTR) // Need utility check (remettre errno a 0 apres ?)
@@ -257,6 +259,86 @@ std::string Server::ipToString(unsigned int ip) const
 		<< (ip & 0xFF);
 	
 	return (oss.str());
+}
+
+int Server::getTimeoutClient(const Client& client, short events) const
+{
+	RequestState state = client.parser.get_status();
+
+	if (events & POLLOUT)
+		return (_config.sendTimeout);
+		
+	if (state == READING_HEADER || state == READING_REQUEST)
+		return (_config.headerTimeout);
+	
+	if (state == READING_BODY || state == READING_CHUNKED)
+		return (_config.bodyTimeout);
+	
+	return (_config.headerTimeout);
+}
+
+std::string Server::buildTimeoutResponse() const
+{
+	return (
+		"HTTP/1.1 408 Request Timeout\r\n"
+		"Content-Length: 15\r\n"
+		"Content-Type: text/plain\r\n"
+		"Connection: close\r\n"
+		"\r\n"
+		"Request Timeout"
+	);
+}
+
+bool Server::handleTimeout(int i)
+{
+	Client &client = _clients[_fds[i].fd];
+
+	if (_fds[i].events & POLLOUT)
+	{
+		removeClient(i);
+		return (true);
+	}
+	
+	client.statusCode = 408;
+	client.response = buildTimeoutResponse();
+	client.bytesSent = 0;
+	
+	if (!client.hasStartTime)
+	{
+		client.startTime = std::time(NULL);
+		client.hasStartTime = true;
+	}
+	
+	printLog(client);
+
+	_fds[i].events = POLLOUT;
+	client.lastActivity = std::time(NULL); // evite de timeout avant reponse
+	
+	return (false);
+}
+
+void Server::checkTimeouts()
+{
+	time_t now = std::time(NULL);
+	
+	for (int i = 0; i < (int)_fds.size(); i++)
+	{
+		int fd = _fds[i].fd;
+		
+		if (fd == _serverFd)
+			continue;
+
+		if (_clients.find(fd) == _clients.end())
+			continue;
+		
+		int timeout = getTimeoutClient(_clients[fd], _fds[i].events);
+		
+		if (now - _clients[fd].lastActivity >= timeout)
+		{
+			if (handleTimeout(i))
+				i--;
+		}
+	}
 }
 
 void Server::acceptClient()
@@ -334,7 +416,7 @@ bool Server::handleClient(int i)
 			return (true);
 		}
 	}	
-		
+	
 	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
 	{
 		client.response = "HTTP/1.1 400 Bad Request\r\n"
@@ -342,6 +424,7 @@ bool Server::handleClient(int i)
 			"Connection: close\r\n"
 			"\r\n"
 			"Bad Request";
+		client.statusCode = client.parser.get_error_code();
 		client.bytesSent = 0;
 		printLog(client);
 		_fds[i].events = POLLOUT;
@@ -359,6 +442,8 @@ bool Server::handleClient(int i)
 		"Connection: close\r\n"
 		"\r\n"
 		"Hello";
+	if (client.parser.get_error_code() == 0)
+		client.statusCode = 200;
 	client.request.print_body();
 	printLog(client);
 	_fds[i].events = POLLOUT;
@@ -378,7 +463,9 @@ bool Server::sendResponse(int i)
 		removeClient(i);
 		return (true);
 	}
+	
 	client.bytesSent += ret;
+	client.lastActivity = std::time(NULL);
 	
 	if (client.bytesSent >= client.response.size())
 	{
@@ -439,6 +526,7 @@ void Server::run()
 			break;
 		if (!handleEvents())
 			break;
+		checkTimeouts();
 	}
 	close(_serverFd);
 	_serverFd = -1;

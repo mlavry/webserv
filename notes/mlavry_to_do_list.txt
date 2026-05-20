@@ -1,37 +1,13 @@
-Timeout mis en place a moitié
-	- J'ai besoin de la requete finale avant de mettre en place le timeout fini
-	(update status incorrect pour le moment)
-
------ A tester ensuite -----
-
-Gérer les premières réponses utiles
-
-Avant les fichiers, fais quelques statuts propres.
-
-À faire :
-
-200 OK
-400 Bad Request
-404 Not Found
-405 Method Not Allowed
-
-Le sujet insiste sur des codes de statut corrects
-
-
 ---- Correct -----
-
-- Mise en place time_t pour le temps de reponse (plus parlant)
 
 - Mise en place plus propre des Timeout
 
-- Stocker le status directement dans Client 
-
-- Mettre code 200 meme si reponse statique 
-
-- Corriger bytes == 0 et on parse_chunk quand meme 
-
-- Le test 3 ne passe toujours pas (probleme requete ?) 
-
-- Ne pas oublier de re tester sur linux une fois patch 
+- Ne pas oublier de re tester sur linux une fois patch // Faire des que possible
 
 - modif log ERROR
+
+- test envoie rien (nc) et donc methode = empty et path = empty
+
+- opti logger au niveau des methodes ?
+
+--- Ensuite on passe a la recuperation des données du .conf 
