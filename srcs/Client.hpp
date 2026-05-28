@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:54 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/15 12:28:42 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/28 14:09:04 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,6 +32,8 @@ class Client
 		ClientRequest parser;
 		std::string response;
 		size_t bytesSent;
+
+		int listenFd;
 
 		bool hasStartTime;
 		time_t startTime;

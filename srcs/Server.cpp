@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/20 17:52:36 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/28 14:15:05 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,15 +41,13 @@
 
 extern volatile sig_atomic_t g_running;
 
-Server::Server() : _serverFd(-1)
+Server::Server()
 {
-	memset(&_serverAddress, 0, sizeof(_serverAddress));
 }
 		
 Server::~Server()
 {
-	if (_serverFd >= 0)
-		close(_serverFd);
+	closeAllFds();
 }
 
 TimeoutConfig::TimeoutConfig()
@@ -59,12 +57,30 @@ TimeoutConfig::TimeoutConfig()
 	sendTimeout = SEND_TIMEOUT;
 }
 
+void Server::setConfig(std::vector<ServerConfig> const &list)
+{
+	_configs = list;
+}
+
 bool Server::setSocketOption(int fd, int option)
 {
 	int opt = 1;
 	if (setsockopt(fd, SOL_SOCKET, option, &opt, sizeof(opt)) < 0)
 		return (false);
 	return (true);
+}
+
+void Server::closeAllFds()
+{
+	for (size_t i = 0; i < _fds.size(); i++)
+	{
+		if (_fds[i].fd >= 0)
+			close (_fds[i].fd);
+	}
+	
+	_fds.clear();
+	_clients.clear();
+	_listenFdToServers.clear();
 }
 
 std::string Server::getTime() const
@@ -156,59 +172,98 @@ void Server::printLog(const Client& client) const
 		<< std::endl;
 }
 
+std::string Server::makeListenKey(const std::string& host, int port)
+{
+	std::ostringstream oss;
+
+	oss << host << ":" << port;
+	return (oss.str());
+}
+
 bool Server::initServer()
 {
-	//AF_INET IPv4
-	//SOCK_STREAM connexion TCP
-	_serverFd = socket(AF_INET, SOCK_STREAM, 0);
-	if (_serverFd < 0)
+	for (size_t i = 0; i < _configs.size(); i++)
 	{
-		std::cerr << "Erreur socket" << std::endl;
-		return (false);
-	}
+		for (size_t j = 0; j < _configs[i].listens.size(); j++)
+		{
+			std::string host = _configs[i].listens[j].host;
+			int port = _configs[i].listens[j].port;
+			std::string key = makeListenKey(host, port);
 
-	// On permet au serveur de se relancer si le port est en cours de fermeture
-	if (!setSocketOption(_serverFd, SO_REUSEADDR))
-	{
-		std::cerr << "Erreur setsockopt" << std::endl;
-		close(_serverFd);
-		_serverFd = -1;
-		return (false);
-	}
+			if (_listenKeyToFd.find(key) != _listenKeyToFd.end())
+			{
+				int existingFd = _listenKeyToFd[key];
 
-	_serverAddress.sin_family = AF_INET;
-	_serverAddress.sin_port = htons(8082);
-	//_serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");//htonl(INADDR_ANY);
-	_serverAddress.sin_addr.s_addr = inet_addr("0.0.0.0");
-	// On attache le socket a une adresse 
-	if (bind(_serverFd, (struct sockaddr *)&_serverAddress, 
-		sizeof(_serverAddress)) < 0)
-	{
-		std::cerr << "Erreur bind" << std::endl;
-		close(_serverFd);
-		_serverFd = -1;
-		return (false);
-	}
+				_listenFdToServers[existingFd].push_back(&_configs[i]);
+				continue;
+			}
+			
+			//AF_INET IPv4
+			//SOCK_STREAM connexion TCP
+			int serverFd = socket(AF_INET, SOCK_STREAM, 0);
+			if (serverFd < 0)
+			{
+				std::cerr << "Erreur socket" << std::endl;
+				return (false);
+			}
+			
+			// On permet au serveur de se relancer si le port est en cours de fermeture
+			if (!setSocketOption(serverFd, SO_REUSEADDR))
+			{
+				std::cerr << "Erreur setsockopt" << std::endl;
+				close(serverFd);
+				serverFd = -1;
+				return (false);
+			}
 
-	// Le socket passe en mode serveur (écoute) et accepete des connexions
-	if (listen(_serverFd, SOMAXCONN) < 0)
-	{
-		std::cerr << "Erreur listen" << std::endl;
-		close(_serverFd);
-		_serverFd = -1;
-		return (false);
-	}
+			sockaddr_in address;
+			memset(&address, 0, sizeof(address));
+			
+			address.sin_family = AF_INET;
+			address.sin_port = htons(_configs[i].listens[j].port);
+			//_serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");//htonl(INADDR_ANY);
+			address.sin_addr.s_addr = inet_addr(_configs[i].listens[j].host.c_str());
+			
+			// On attache le socket a une adresse 
+			std::cout << "Trying bind: "
+          		<< _configs[i].listens[j].host << ":"
+          		<< _configs[i].listens[j].port
+          		<< std::endl;
+			if (bind(serverFd, (struct sockaddr *)&address, 
+				sizeof(address)) < 0)
+			{
+				std::cerr << "Erreur bind on "
+          			<< _configs[i].listens[j].host << ":"
+          			<< _configs[i].listens[j].port
+          			<< " -> " << strerror(errno) << std::endl;
+				close(serverFd);
+				serverFd = -1;
+				return (false);
+			}
+			
+			// Le socket passe en mode serveur (écoute) et accepete des connexions
+			if (listen(serverFd, SOMAXCONN) < 0)
+			{
+				std::cerr << "Erreur listen" << std::endl;
+				close(serverFd);
+				serverFd = -1;
+				return (false);
+			}
 	
-	// On récupére les flags et on passe et on ajoute le non bloquant
-	int flags = fcntl(_serverFd, F_GETFL, 0);
-	if (flags < 0 || fcntl(_serverFd, F_SETFL, flags | O_NONBLOCK) < 0)
-	{
-		std::cerr << "Erreur fcntl" << std::endl;
-		close(_serverFd);
-		_serverFd = -1;
-		return (false);
+			// On récupére les flags et on passe et on ajoute le non bloquant
+			int flags = fcntl(serverFd, F_GETFL, 0);
+			if (flags < 0 || fcntl(serverFd, F_SETFL, flags | O_NONBLOCK) < 0)
+			{
+				std::cerr << "Erreur fcntl" << std::endl;
+				close(serverFd);
+				serverFd = -1;
+				return (false);
+			}
+			_listenKeyToFd[key] = serverFd;
+			_listenFdToServers[serverFd].push_back(&_configs[i]);
+			initPoll(serverFd);
+		}
 	}
-
 	return (true);
 }
 
@@ -219,10 +274,10 @@ void Server::removeClient(int i)
 	_fds.erase(_fds.begin() + i);
 }
 
-void Server::initPoll()
+void Server::initPoll(int fd)
 {
 	pollfd server_poll_fd;
-	server_poll_fd.fd = _serverFd;
+	server_poll_fd.fd = fd;
 	server_poll_fd.events = POLLIN;
 	server_poll_fd.revents = 0;
 	_fds.push_back(server_poll_fd);
@@ -266,15 +321,15 @@ int Server::getTimeoutClient(const Client& client, short events) const
 	RequestState state = client.parser.get_status();
 
 	if (events & POLLOUT)
-		return (_config.sendTimeout);
+		return (_timeoutConfig.sendTimeout);
 		
 	if (state == READING_HEADER || state == READING_REQUEST)
-		return (_config.headerTimeout);
+		return (_timeoutConfig.headerTimeout);
 	
 	if (state == READING_BODY || state == READING_CHUNKED)
-		return (_config.bodyTimeout);
+		return (_timeoutConfig.bodyTimeout);
 	
-	return (_config.headerTimeout);
+	return (_timeoutConfig.headerTimeout);
 }
 
 std::string Server::buildTimeoutResponse() const
@@ -325,7 +380,7 @@ void Server::checkTimeouts()
 	{
 		int fd = _fds[i].fd;
 		
-		if (fd == _serverFd)
+		if (_listenFdToServers.find(fd) != _listenFdToServers.end())
 			continue;
 
 		if (_clients.find(fd) == _clients.end())
@@ -341,15 +396,16 @@ void Server::checkTimeouts()
 	}
 }
 
-void Server::acceptClient()
+void Server::acceptClient(int listenFd)
 {
 	sockaddr_in client_addr;
 	socklen_t client_len = sizeof(client_addr);
 	
-	int client_fd = accept(_serverFd, (struct sockaddr *)&client_addr,
+	int client_fd = accept(listenFd, (struct sockaddr *)&client_addr,
 		&client_len);
 	if (client_fd < 0)
 		return;
+	std::cout << "Client accepted on listenFd: " << listenFd << std::endl;
 
 	int flags = fcntl(client_fd, F_GETFL, 0);
 	if (flags < 0 || fcntl(client_fd, F_SETFL, flags | O_NONBLOCK)
@@ -366,6 +422,7 @@ void Server::acceptClient()
 	_fds.push_back(client_poll_fd);
 
 	_clients[client_fd] = Client(client_fd);
+	_clients[client_fd].listenFd = listenFd;
 	_clients[client_fd].ip = ipToString(client_addr.sin_addr.s_addr);
 	std::cout << "Client ajouté dans poll" << std::endl;
 }
@@ -417,7 +474,7 @@ bool Server::handleClient(int i)
 		}
 	}	
 	
-	if (state == ERROR || state == TIME_OUT) // gérer TIMEOUT AILLEURS
+	if (state == ERROR)
 	{
 		client.response = "HTTP/1.1 400 Bad Request\r\n"
 			"Content-Length: 11\r\n"
@@ -480,7 +537,7 @@ bool Server::handleEvents()
 {
 	for (int i = 0; i < (int)_fds.size(); i++)
 	{
-		if (_fds[i].fd == _serverFd)
+		if (_listenFdToServers.find(_fds[i].fd) != _listenFdToServers.end())
 		{
 			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
 			{
@@ -488,7 +545,7 @@ bool Server::handleEvents()
 				return (false);
 			}
 			if (_fds[i].revents & POLLIN)
-				acceptClient();
+				acceptClient(_fds[i].fd);
 		}
 		else
 		{
@@ -519,7 +576,6 @@ bool Server::handleEvents()
 void Server::run()
 {
 	std::cout << GREEN "Lancement du serveur..." RESET << std::endl;
-	initPoll();
 	while (g_running)
 	{
 		if (!checkPoll())
@@ -528,6 +584,5 @@ void Server::run()
 			break;
 		checkTimeouts();
 	}
-	close(_serverFd);
-	_serverFd = -1;
+	closeAllFds();
 }

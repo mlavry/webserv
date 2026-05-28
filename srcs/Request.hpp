@@ -24,7 +24,6 @@ enum    RequestState
     READING_BODY,
     READING_CHUNKED,
     COMPLETE,
-	TIME_OUT,
     ERROR
 };
 

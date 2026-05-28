@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/20 17:20:11 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/28 13:58:39 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 # define SERVER_HPP
 
 #include "Client.hpp"
+#include "../config_loader/Config.hpp"
 
 #include <vector>
 #include <sys/socket.h>
@@ -41,29 +42,34 @@ class Server
 		//----------- Methode publique ----------
 		bool initServer();
 		void run();
+		void setConfig(std::vector<ServerConfig> const &list);
+
 	private:
-		//------------ Variable ----------
-		int _serverFd;
-		sockaddr_in _serverAddress;
-		std::vector<pollfd> _fds;
-		std::map<int, Client> _clients;
-		
-		//------------ Variable (timeout config) ----------
-		TimeoutConfig _config;
-		
 		//------------ Forme canonique ----------
 		Server(const Server& other);
+	
+		//------------ Variable ----------
+		std::vector<pollfd> _fds;
+		std::map<int, Client> _clients;
+		std::map<int, std::vector<const ServerConfig*> > _listenFdToServers;
+		std::map<std::string, int> _listenKeyToFd;
+
+		//------------ Variable (config) ----------
+		TimeoutConfig _timeoutConfig;
+		std::vector<ServerConfig> _configs;
 
 		//------------ Methode server principale ----------
-		void initPoll();
+		void initPoll(int fd);
 		bool checkPoll();
 		bool handleEvents();
-		void acceptClient();
+		void acceptClient(int listenFd);
 		bool handleClient(int i);
 		bool sendResponse(int i);
 		bool setSocketOption(int fd, int option);
 		void removeClient(int i);
 		void checkTimeouts();
+		void closeAllFds();
+		std::string makeListenKey(const std::string& host, int port);
 		
 		//------------ Methode logger ----------
 		std::string methodColor(const std::string& method) const;

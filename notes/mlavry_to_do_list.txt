@@ -1,7 +1,5 @@
 ---- Correct -----
 
-- Mise en place plus propre des Timeout
-
 - Ne pas oublier de re tester sur linux une fois patch // Faire des que possible
 
 - modif log ERROR
@@ -11,3 +9,11 @@
 - opti logger au niveau des methodes ?
 
 --- Ensuite on passe a la recuperation des données du .conf 
+
+- launching message with server_name and port 
+
+- modif launching conf 
+
+- check meme port 
+
+- stocker le serveur d'ecoute dans le client 

@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/14 17:15:28 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/13 19:10:34 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/05/26 18:08:11 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, handle_signal);
 	signal(SIGTERM, handle_signal);
 
+	Server server;
 	
     std::string path;
 
@@ -83,15 +84,14 @@ int main(int argc, char *argv[])
     try
     {
         Config config(path);
+		server.setConfig(config.getServers());
     }
     catch (const std::exception& e)
     {
         std::cerr << "Config error: " << e.what() << std::endl;
         return (1);
     }
-
 	
-	Server server;
 	if (!server.initServer())
 		return (1);
 	server.run();
