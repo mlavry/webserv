@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/28 14:15:05 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/03 17:06:31 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -170,6 +170,61 @@ void Server::printLog(const Client& client) const
 		<< std::fixed << std::setprecision(2)
 		<< response_time << "s"
 		<< std::endl;
+}
+
+void Server::printRequestHeader(const Request& request) const
+{
+	std::string method = truncString(request.method, 8);
+	std::string path = truncString(request.path + (request.query.empty() ? "" : "?" + request.query), 48);
+
+	std::cout << BOLD << MAGENTA << "→ " << RESET
+			  << methodColor(request.method) << std::left << std::setw(8) << method << RESET
+			  << " " << std::left << std::setw(48) << path
+			  << " " << DIM << request.http_version << RESET
+			  << std::endl;
+
+	int printed = 0;
+	for (std::map<std::string, std::string>::const_iterator it = request.header.begin();
+		 it != request.header.end() && printed < 12; ++it, ++printed)
+	{
+		std::string key = it->first;
+		std::string val = it->second;
+		std::cout << "  " << CYAN << key << RESET << ": " << truncString(val, 120) << std::endl;
+	}
+	if (request.header.size() > (size_t)printed)
+		std::cout << "  " << DIM << "... (" << (request.header.size() - printed) << " more headers)" << RESET << std::endl;
+}
+
+void Server::printResponseHeader(const HttpResponse& response) const
+{
+	int status = response.get_http_status();
+	size_t remaining = response.get_remaining_bytes();
+
+	std::cout << BOLD << MAGENTA << "← " << RESET
+			  << statusColor(status) << std::setw(3) << status << RESET
+			  << " │ " << std::right << remaining << "B remaining" << RESET
+			  << std::endl;
+
+	const char* data = response.get_response_data();
+	size_t len = remaining;
+	if (data && len > 0)
+	{
+		size_t peek_len = (len > 1024 ? 1024 : len);
+		std::string s(data, data + peek_len);
+		size_t pos = s.find("\r\n\r\n");
+		std::string headers = (pos != std::string::npos) ? s.substr(0, pos) : s;
+
+		std::istringstream iss(headers);
+		std::string line;
+		while (std::getline(iss, line))
+		{
+			if (!line.empty() && line[line.size() - 1] == '\r')
+				line.resize(line.size() - 1);
+			std::cout << "  " << DIM << line << RESET << std::endl;
+		}
+		if (pos == std::string::npos && len > peek_len)
+			std::cout << "  " << DIM << "... (truncated)" << RESET << std::endl;
+	}
 }
 
 std::string Server::makeListenKey(const std::string& host, int port)
@@ -427,6 +482,32 @@ void Server::acceptClient(int listenFd)
 	std::cout << "Client ajouté dans poll" << std::endl;
 }
 
+const ServerConfig* Server::getMatchedServer(const std::string& host_header, int listenFd) const
+{
+	std::string host = host_header;
+    size_t colon_pos = host.find(':');
+    if (colon_pos != std::string::npos)
+        host = host.substr(0, colon_pos);
+
+    std::map<int, std::vector<const ServerConfig*> >::const_iterator it = _listenFdToServers.find(listenFd);
+    
+    if (it == _listenFdToServers.end() || it->second.empty())
+        return (NULL); 
+
+    const std::vector<const ServerConfig*>& port_configs = it->second;
+
+    for (size_t i = 0; i < port_configs.size(); ++i)
+    {
+        for (size_t j = 0; j < port_configs[i]->serverNames.size(); ++j)
+        {
+            if (port_configs[i]->serverNames[j] == host)
+                return (port_configs[i]); // Found a match on this port!
+        }
+    }
+
+    return (port_configs[0]);
+}
+
 bool Server::handleClient(int i)
 {
 	Client &client = _clients[_fds[i].fd];
@@ -443,7 +524,6 @@ bool Server::handleClient(int i)
 	}
 	else if (bytes > 0)
 	{
-		//std::cout << "data received" << std::endl;
 		client.lastActivity = std::time(NULL);
 		if (!client.hasStartTime)
 		{
@@ -452,17 +532,9 @@ bool Server::handleClient(int i)
 		}
 		client.parser.parse_chunk(buffer, bytes, client.request);
 	}
-	//std::cout << client.parser.get_error_code() << std::endl;
-	//std::cout << "status: " << state << std::endl;
 
 	state = client.parser.get_status();
-
-	//std::cout << "state: " << state
-	//	<< " method: [" << client.request.method << "]"
-	//	<< " path: [" << client.request.path << "]"
-	//	<< " error: " << client.parser.get_error_code()
-	//	<< std::endl;
-	
+    
 	if (bytes == 0)
 	{
 		std::cout << "recv = 0 bytes" << std::endl;
@@ -472,64 +544,74 @@ bool Server::handleClient(int i)
 			removeClient(i);
 			return (true);
 		}
-	}	
-	
+	}
+
+    const ServerConfig* active_config = getMatchedServer(client.request.get_host(), client.listenFd);
+
 	if (state == ERROR)
-	{
-		client.response = "HTTP/1.1 400 Bad Request\r\n"
-			"Content-Length: 11\r\n"
-			"Connection: close\r\n"
-			"\r\n"
-			"Bad Request";
-		client.statusCode = client.parser.get_error_code();
-		client.bytesSent = 0;
+	{	
+		client.isKeepAlive = client.request.keep_alive;
+		client.response_builder.generate_error(client.parser.get_error_code(), active_config, client.request);
+		client.statusCode = client.response_builder.get_http_status();
 		printLog(client);
 		_fds[i].events = POLLOUT;
 		return (false);
 	}
-	
-	if (state != COMPLETE)
-		return (false);
 
-	client.bytesSent = 0;
-	client.response =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: 5\r\n"
-		"Content-Type: text/plain\r\n"
-		"Connection: close\r\n"
-		"\r\n"
-		"Hello";
-	if (client.parser.get_error_code() == 0)
-		client.statusCode = 200;
-	client.request.print_body();
-	printLog(client);
-	_fds[i].events = POLLOUT;
+	if (state == COMPLETE)
+	{
+		client.isKeepAlive = client.request.keep_alive;
+		//printRequestHeader(client.request);
+		client.response_builder.generate(client.request, active_config, client);
+		client.statusCode = client.response_builder.get_http_status();
+		printLog(client);
+		_fds[i].events = POLLOUT;
+		return (false);
+	}
 	return (false);
+}
+
+void Server::resetClientForNextRequet(Client& client)
+{
+	//Check avec chouaib pour reset les struct request et reponse
+	//client.parser = ClientRequest();
+	client.hasStartTime = false;
+	client.bytesSent = 0;
+	client.statusCode = 0;
+	client.isKeepAlive = true;
+	client.lastActivity = std::time(NULL);
 }
 
 bool Server::sendResponse(int i)
 {
 	Client &client = _clients[_fds[i].fd];
 	
-	size_t remaining = client.response.size() - client.bytesSent;
+	size_t		bytes_to_send = client.response_builder.get_remaining_bytes();
+	//if (client.response_builder.get_state() == RESPONSE_READY_TO_SEND)
+	//	printResponseHeader(client.response_builder);
 	
-	int ret = send(_fds[i].fd, client.response.c_str() + client.bytesSent, 
-		remaining, 0);
+	int ret = send(_fds[i].fd, client.response_builder.get_response_data(), bytes_to_send, 0);
 	if (ret <= 0)
 	{
 		removeClient(i);
 		return (true);
 	}
-	
-	client.bytesSent += ret;
-	client.lastActivity = std::time(NULL);
-	
-	if (client.bytesSent >= client.response.size())
-	{
-		removeClient(i);
-		return (true);
-	}
+	client.response_builder.add_bytes_sent(ret);
 
+	client.lastActivity = std::time(NULL);
+
+	if (client.response_builder.get_state() == RESPONSE_COMPLETE)
+	{
+		if (!client.isKeepAlive)
+		{
+			std::cout << "Not keep alive" << std::endl;
+			removeClient(i);	// try to Keep-Alive
+			return (true);
+		}
+		client.request.~Request();
+		resetClientForNextRequet(client);
+		_fds[i].events = POLLIN;
+	}
 	return (false);
 }
 

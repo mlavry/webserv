@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/14 17:15:28 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/26 18:08:11 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/03 16:54:54 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,7 +36,7 @@ static bool getPath(int argc, char *argv[], std::string& path)
     }
     else if (argc == 2)
     {
-        path = "configs/" + std::string(argv[1]);
+        path = std::string(argv[1]);
     }
     else 
     {
@@ -62,6 +62,32 @@ static bool checkConfExtension(const std::string& path)
     return (true);
 }
 
+static void printLocationCgi(const std::vector<ServerConfig>& servers)
+{
+    for (size_t serverIndex = 0; serverIndex < servers.size(); ++serverIndex)
+    {
+        const ServerConfig& server = servers[serverIndex];
+
+        for (size_t locationIndex = 0; locationIndex < server.locations.size(); ++locationIndex)
+        {
+            const LocationConfig& location = server.locations[locationIndex];
+
+            if (location.cgi.empty() == true)
+            {
+                continue;
+            }
+
+            std::cout << "server[" << serverIndex << "] location[" << locationIndex << "] path="
+                      << location.path << std::endl;
+            for (std::map<std::string, std::string>::const_iterator it = location.cgi.begin();
+                 it != location.cgi.end(); ++it)
+            {
+                std::cout << "  " << it->first << " -> " << it->second << std::endl;
+            }
+        }
+    }
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -84,6 +110,7 @@ int main(int argc, char *argv[])
     try
     {
         Config config(path);
+		printLocationCgi(config.getServers());
 		server.setConfig(config.getServers());
     }
     catch (const std::exception& e)

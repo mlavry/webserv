@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/05/12 17:34:56 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/03 16:43:03 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,13 @@
 #include <iostream>
 #include <sstream>
 #include <limits.h>
+
+std::string	Request::get_host() const
+{
+    if (header.find("Host") != header.end())
+		return (header.at("Host"));
+	return ("");
+}
 
 ClientRequest::ClientRequest()
 {
@@ -28,11 +35,31 @@ ClientRequest::ClientRequest()
 	current_data_size_readed = 0;
 	reading_data_chunked = false;
 	crlf_received = false;
+	config = NULL;
 }
 
 ClientRequest::~ClientRequest()
 {
 	
+}
+
+Request::Request()
+{
+    this->method = "";
+    this->path = "";
+	keep_alive = true;
+    this->location_match = NULL; 
+}
+
+
+Request::~Request()
+{
+	this->method.clear();
+    this->path.clear();
+	header.clear();
+	body.clear();
+	keep_alive = false;
+    this->location_match = NULL; 
 }
 
 void Request::print_body() const
@@ -51,8 +78,7 @@ void ClientRequest::parse_request_line(Request& request)
 	if (request_length == std::string::npos)
 		return ;
 	line = data.substr(0, request_length);
-	
-	// we extracted the request and we now erase it so it will start from the header (+ 2 for the \r\n);
+
 	data.erase(0, request_length + 2);
 	std::istringstream	iss(line);
 	std::string			extra;
@@ -61,14 +87,14 @@ void ClientRequest::parse_request_line(Request& request)
 	|| request.http_version.empty() || (iss >> extra))
 	{
 		status = ERROR;
-		http_error_code = 400;
+		set_error_code(400);
 		return ;
 	}
 	if (request.method != "GET" && request.method != "HEAD"
-		&& request.method != "POST" && request.method != "DELETE") //modif but don't correct the bug
+		&& request.method != "POST" && request.method != "DELETE")
 	{
 		status = ERROR;
-		http_error_code = 501;
+		set_error_code(501);
 		return ;
 	}
 	if (request.http_version != "HTTP/1.1")
@@ -77,18 +103,28 @@ void ClientRequest::parse_request_line(Request& request)
 		set_error_code(505);
 		return ;
 	}
+	size_t	query_pos = request.method.find("?");
+	if (query_pos != std::string::npos)
+	{
+		request.query = request.path.substr(query_pos + 1);
+    	request.path = request.path.substr(0, query_pos);
+	}
 	status = READING_HEADER;
+}
+
+bool ClientRequest::is_keep_alive(Request& request)
+{
+    std::map<std::string, std::string>::iterator it;
+
+    it = request.header.find("Connection");
+    if (it != request.header.end() && it->second == "close")
+        request.keep_alive = false;
+
+    return (request.keep_alive);
 }
 
 void			ClientRequest::parse_body(Request& request)
 {
-	/*
-	if (!is_available_method_with_path(request.method, request.path)) 
-	{
-		status = ERROR;
-		set_error_code(405);
-	}
-	*/
 	size_t bytes_to_read;
 
 	if (body_bytes_readed > content_length)
@@ -112,7 +148,10 @@ void			ClientRequest::parse_body(Request& request)
 	data.erase(0, bytes_to_read);
 	body_bytes_readed += bytes_to_read;
 	if (body_bytes_readed == content_length)
+	{
+		is_keep_alive(request);
 		status = COMPLETE;
+	}
 }
 
 long	ClientRequest::get_chunk_size(const std::string& hex_size)
@@ -333,7 +372,7 @@ void ClientRequest::parse_headers(Request& request)
 		data.erase(0, end_of_line + 2);
 
 		if (line.empty())
-		{
+		{	
 			bool has_content_length = request.header.find("Content-Length") != request.header.end();
 			bool has_transfer_encoding = request.header.find("Transfer-Encoding") != request.header.end();
 			

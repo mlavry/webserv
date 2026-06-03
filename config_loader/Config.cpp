@@ -16,6 +16,7 @@
 #include <fstream>   // ifstream                 (ouvrir et lire un fichier)
 #include <sstream>   // stringstream, rdbuf()    (mettre le contenu du fichier en mémoire + transformer fichier en string)
 #include <stdexcept> // throw, runtime_error     (gérer les erreurs)
+#include <iostream>
 
 Config::Config()
 {

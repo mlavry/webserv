@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/05/28 13:58:39 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/03 12:39:03 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 # define SERVER_HPP
 
 #include "Client.hpp"
+#include "Response.hpp"
 #include "../config_loader/Config.hpp"
 
 #include <vector>
@@ -70,9 +71,14 @@ class Server
 		void checkTimeouts();
 		void closeAllFds();
 		std::string makeListenKey(const std::string& host, int port);
-		
+		void resetClientForNextRequet(Client& client);
+
+		const ServerConfig* getMatchedServer(const std::string& host_header, int listenFd) const;
+
 		//------------ Methode logger ----------
 		std::string methodColor(const std::string& method) const;
+		void printRequestHeader(const Request& request) const;
+		void printResponseHeader(const HttpResponse& response) const;
 		void printLog(const Client& client) const;
 		std::string getTime() const;
 		std::string ipToString(unsigned int ip) const;
@@ -84,6 +90,10 @@ class Server
 		int getTimeoutClient(const Client& client, short events) const;
 		std::string buildTimeoutResponse() const;
 		bool handleTimeout(int i);
+
+		//------------ CGI ----------
+		
+		std::map<int, int> client_pipe;
 };
 
 #endif
