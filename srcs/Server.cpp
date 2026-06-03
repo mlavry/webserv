@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/03 17:06:31 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/03 17:27:16 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -574,7 +574,8 @@ bool Server::handleClient(int i)
 void Server::resetClientForNextRequet(Client& client)
 {
 	//Check avec chouaib pour reset les struct request et reponse
-	//client.parser = ClientRequest();
+	client.parser = ClientRequest();
+	client.request.clear();
 	client.hasStartTime = false;
 	client.bytesSent = 0;
 	client.statusCode = 0;
@@ -608,7 +609,6 @@ bool Server::sendResponse(int i)
 			removeClient(i);	// try to Keep-Alive
 			return (true);
 		}
-		client.request.~Request();
 		resetClientForNextRequet(client);
 		_fds[i].events = POLLIN;
 	}

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:22 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/05/29 17:01:38 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/03 17:26:34 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,7 +49,7 @@ struct Request
 	std::vector<char>	                body;
 
 	const LocationConfig*				location_match;
-	// void			clear();
+	 void			clear();
 };
 
 class ClientRequest

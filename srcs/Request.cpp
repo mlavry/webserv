@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/03 16:43:03 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/03 17:26:21 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,6 +60,15 @@ Request::~Request()
 	body.clear();
 	keep_alive = false;
     this->location_match = NULL; 
+}
+
+void    Request::clear()
+{
+    this->method.clear();
+    this->path.clear();
+    header.clear();
+    body.clear();
+    this->location_match = NULL;
 }
 
 void Request::print_body() const
