@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/03 17:27:16 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/04 14:21:58 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -537,10 +537,10 @@ bool Server::handleClient(int i)
     
 	if (bytes == 0)
 	{
-		std::cout << "recv = 0 bytes" << std::endl;
+		//std::cout << "recv = 0 bytes" << std::endl;
 		if (state != COMPLETE)
 		{
-			std::cout << "status != COMPLETE" << std::endl;
+			//std::cout << "status != COMPLETE" << std::endl;
 			removeClient(i);
 			return (true);
 		}
@@ -553,6 +553,7 @@ bool Server::handleClient(int i)
 		client.isKeepAlive = client.request.keep_alive;
 		client.response_builder.generate_error(client.parser.get_error_code(), active_config, client.request);
 		client.statusCode = client.response_builder.get_http_status();
+		client.response = std::string(client.response_builder.get_response_data());
 		printLog(client);
 		_fds[i].events = POLLOUT;
 		return (false);
@@ -564,6 +565,7 @@ bool Server::handleClient(int i)
 		//printRequestHeader(client.request);
 		client.response_builder.generate(client.request, active_config, client);
 		client.statusCode = client.response_builder.get_http_status();
+		client.response = std::string(client.response_builder.get_response_data());
 		printLog(client);
 		_fds[i].events = POLLOUT;
 		return (false);
