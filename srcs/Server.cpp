@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/04 14:21:58 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/08 14:35:44 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -463,8 +463,7 @@ void Server::acceptClient(int listenFd)
 	std::cout << "Client accepted on listenFd: " << listenFd << std::endl;
 
 	int flags = fcntl(client_fd, F_GETFL, 0);
-	if (flags < 0 || fcntl(client_fd, F_SETFL, flags | O_NONBLOCK)
-		< 0)
+	if (flags < 0 || fcntl(client_fd, F_SETFL, flags | O_NONBLOCK) < 0)
 	{
 		close(client_fd);
 		return;
@@ -537,10 +536,10 @@ bool Server::handleClient(int i)
     
 	if (bytes == 0)
 	{
-		//std::cout << "recv = 0 bytes" << std::endl;
+		// std::cout << "recv = 0 bytes" << std::endl;
 		if (state != COMPLETE)
 		{
-			//std::cout << "status != COMPLETE" << std::endl;
+			// std::cout << "status != COMPLETE" << std::endl;
 			removeClient(i);
 			return (true);
 		}
@@ -550,32 +549,58 @@ bool Server::handleClient(int i)
 
 	if (state == ERROR)
 	{	
-		client.isKeepAlive = client.request.keep_alive;
 		client.response_builder.generate_error(client.parser.get_error_code(), active_config, client.request);
+		client.isKeepAlive = client.request.keep_alive;
 		client.statusCode = client.response_builder.get_http_status();
-		client.response = std::string(client.response_builder.get_response_data());
-		printLog(client);
+		// printLog(client);
 		_fds[i].events = POLLOUT;
 		return (false);
 	}
 
 	if (state == COMPLETE)
 	{
-		client.isKeepAlive = client.request.keep_alive;
-		//printRequestHeader(client.request);
+		printRequestHeader(client.request);
+		// client.isKeepAlive = client.request.keep_alive;
 		client.response_builder.generate(client.request, active_config, client);
+		client.isKeepAlive = client.request.keep_alive;
 		client.statusCode = client.response_builder.get_http_status();
-		client.response = std::string(client.response_builder.get_response_data());
-		printLog(client);
-		_fds[i].events = POLLOUT;
+		// printLog(client);
+		if (client.cgi.stats == CGI_READING || client.cgi.stats == CGI_WRITING)
+		{
+			connect_cgi_to_poll(client);
+			_fds[i].events = 0;
+		}
+		else
+			_fds[i].events = POLLOUT;
 		return (false);
 	}
 	return (false);
 }
 
+void	Server::connect_cgi_to_poll(Client& client)
+{
+	if (client.cgi.stats == CGI_WRITING)
+	{
+		pollfd	p_fd_in;
+		p_fd_in.fd = client.cgi.pipe_in;
+		p_fd_in.events = POLLOUT;
+		p_fd_in.revents = 0;
+
+		_fds.push_back(p_fd_in);
+		client_pipe[client.cgi.pipe_in] = client.fd;
+	}
+
+	pollfd	p_fd_out;
+	p_fd_out.fd = client.cgi.pipe_out;
+	p_fd_out.events = POLLIN;
+	p_fd_out.revents = 0;
+
+	_fds.push_back(p_fd_out);
+	client_pipe[client.cgi.pipe_out] = client.fd;
+}
+
 void Server::resetClientForNextRequet(Client& client)
 {
-	//Check avec chouaib pour reset les struct request et reponse
 	client.parser = ClientRequest();
 	client.request.clear();
 	client.hasStartTime = false;
@@ -585,13 +610,13 @@ void Server::resetClientForNextRequet(Client& client)
 	client.lastActivity = std::time(NULL);
 }
 
-bool Server::sendResponse(int i)
+bool	Server::sendResponse(int i)
 {
 	Client &client = _clients[_fds[i].fd];
 	
 	size_t		bytes_to_send = client.response_builder.get_remaining_bytes();
-	//if (client.response_builder.get_state() == RESPONSE_READY_TO_SEND)
-	//	printResponseHeader(client.response_builder);
+	if (client.response_builder.get_state() == RESPONSE_READY_TO_SEND)
+		printResponseHeader(client.response_builder);
 	
 	int ret = send(_fds[i].fd, client.response_builder.get_response_data(), bytes_to_send, 0);
 	if (ret <= 0)
@@ -613,6 +638,81 @@ bool Server::sendResponse(int i)
 		}
 		resetClientForNextRequet(client);
 		_fds[i].events = POLLIN;
+	}
+	return (false);
+}
+
+bool	Server::handle_sending_data_to_cgi(int i)
+{
+	int pipe_fd_in = _fds[i].fd;
+	Client &client = _clients[client_pipe[pipe_fd_in]];
+
+	if (client.cgi.stats == CGI_WRITING)
+	{
+		int bytes_writted = write(pipe_fd_in, client.request.body.data() + client.cgi.bytes_sended,
+								client.request.body.size() - client.cgi.bytes_sended);
+		
+		if (bytes_writted < 0)
+		{
+			close(pipe_fd_in);
+			client.cgi.stats = CGI_ERROR;
+			client_pipe.erase(pipe_fd_in);
+			_fds.erase(_fds.begin() + i);
+			return (true);
+		}
+		client.cgi.bytes_sended += bytes_writted;
+		if (client.cgi.bytes_sended >= client.request.body.size())
+		{
+			close(pipe_fd_in);
+			client_pipe.erase(pipe_fd_in);
+			client.cgi.stats = CGI_READING;
+			_fds.erase(_fds.begin() + i);
+			return (true);
+		}
+	}
+	return (false);
+}
+
+bool	Server::handle_reading_data_to_cgi(int i)
+{
+	int pipe_fd_out = _fds[i].fd;
+	Client &client = _clients[client_pipe[pipe_fd_out]];
+	char	buffer[1024];
+
+	if (client.cgi.stats == CGI_READING)
+	{
+		int	bytes_readed = read(pipe_fd_out, buffer, sizeof(buffer));
+		if (bytes_readed < 0)
+		{
+			close(pipe_fd_out);
+			client_pipe.erase(pipe_fd_out);
+			_fds.erase(_fds.begin() + i);
+			client.cgi.stats = CGI_ERROR;
+			return (true);
+		}
+		else if (bytes_readed == 0)
+		{
+			close(pipe_fd_out);
+			client_pipe.erase(pipe_fd_out);
+			client.cgi.stats = CGI_FINISHED;
+			client.response_builder.parse_cgi_output(client.cgi.response_buffer, client.request);
+			
+			_fds.erase(_fds.begin() + i);
+			for (size_t j = 0; j < _fds.size(); ++j)
+            {
+                if (_fds[j].fd == client.fd)
+                {
+                    _fds[j].events = POLLOUT;
+                    break ;
+                }
+            }
+			return (true);
+		}
+		else
+		{
+			client.cgi.response_buffer.insert(client.cgi.response_buffer.end(),
+                                              buffer, buffer + bytes_readed);
+		}
 	}
 	return (false);
 }
@@ -640,15 +740,24 @@ bool Server::handleEvents()
 				removeClient(i);
 				removed = true;
 			}
-			if (!removed && (_fds[i].revents & POLLIN))
-				removed = handleClient(i);
-			if (!removed && (_fds[i].revents & POLLOUT))
-				removed = sendResponse(i);
-			if (!removed && (_fds[i].revents & POLLHUP)
-				&& !(_fds[i].events & POLLOUT))
+			if (client_pipe.find(_fds[i].fd) != client_pipe.end())
 			{
-				removeClient(i);
-				removed = true;
+                if (_fds[i].revents & POLLOUT)
+					removed = handle_sending_data_to_cgi(i);
+				else if (_fds[i].revents & (POLLIN | POLLHUP))
+					removed = handle_reading_data_to_cgi(i);
+			}
+			else {
+				if (!removed && (_fds[i].revents & POLLIN))
+					removed = handleClient(i);
+				if (!removed && (_fds[i].revents & POLLOUT))
+					removed = sendResponse(i);
+				if (!removed && (_fds[i].revents & POLLHUP)
+					&& !(_fds[i].events & POLLOUT))
+				{
+					removeClient(i);
+					removed = true;
+				}
 			}
 			if (removed)
 				i--;

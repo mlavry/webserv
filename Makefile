@@ -10,6 +10,7 @@ config_loader/ConfigParser.cpp \
 srcs/Server.cpp \
 srcs/Client.cpp \
 srcs/Response.cpp \
+srcs/CgiHandler.cpp \
 srcs/Request.cpp
 
 OBJ = $(SRC:.cpp=.o)

@@ -6,90 +6,189 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/31 14:32:21 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/02 16:30:08 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/08 15:13:32 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "CgiHandler.hpp"
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
 #include <unistd.h>
 #include <fcntl.h>
 
-// CgiHandler::CgiHandler() : cgi_pid(-1), stats(CGI_INIT), bytes_sended(0), start_time(0), envp(NULL)
-// {
-//     pipe_out = -1;
-//     pipe_in = -1;
-// }
+CgiHandler::CgiHandler() : cgi_pid(-1), stats(STAND_BY), envp(NULL), bytes_sended(0)
+{
+    pipe_out = -1;
+    pipe_in = -1;
+}
 
-// CgiHandler::~CgiHandler()
-// {
-// 	if (this->envp)
-// 	{
-// 		delete[]	envp;
-// 		envp = NULL;
-// 	}
-// }
+CgiHandler::~CgiHandler()
+{
+	if (this->envp)
+	{
+		delete[] envp;
+		envp = NULL;
+	}
+}
 
-// void	CgiHandler::create_env_variable(const Request& request, const ServerConfig *config)
-// {
-// 	if (request.method == "GET" || request.method == "POST")
-// 		env_variable.push_back("REQUEST_METHOD=" + request.method);
-// 	env_variable.push_back("QUERY_STRING=" + request.query);
-// 	env_variable.push_back("PATH_INFO=" + request.path);
-// 	std::string	script_name = request.path.substr(request.path.find_last_of("/") + 1, request.path.length());
-// 	env_variable.push_back(("SCRIPT_FILENAME=" + config->root + script_name));
-// 	if (request.method == "POST")
-// 	{
-// 		for (std::map<std::string, std::string>::const_iterator	it = request.header.begin(); it != request.header.end(); ++it)
-// 		{
-// 			if (it->first == "Content-Type" && !it->second.empty())
-// 				env_variable.push_back("CONTENT_TYPE=" + it->second);
-// 			if (it->first == "Content-Length" && !it->second.empty())
-// 				env_variable.push_back("CONTENT_LENGTH=" + it->second);
-// 		}
-// 	}
-// }
+void	CgiHandler::create_env_variable(const Request& request, const std::string& target_file_path)
+{
+    env_variable.clear();
 
-// void	CgiHandler::handle_script(const Request& request, const ServerConfig *config, std::string cgi_extention)
-// {   
-//     bytes_sended = 0;
-// 	create_env_variable(request, config);
-//     stats = CGI_INIT;
+    if (request.method == "GET" || request.method == "POST")
+        env_variable.push_back("REQUEST_METHOD=" + request.method);
 
-// 	int	fd_in[2];
-// 	int	fd_out[2];
+    env_variable.push_back("QUERY_STRING=" + request.query);
+    env_variable.push_back("PATH_INFO=" + request.path);
+    env_variable.push_back("SCRIPT_FILENAME=" + target_file_path);
 
-// 	if (pipe(fd_in) < 0 || pipe(fd_out))
-// 	{
-// 		stats = CGI_ERROR;
-// 		return ;
-// 	}
+    if (request.method == "POST")
+    {
+        for (std::map<std::string, std::string>::const_iterator it = request.header.begin();
+             it != request.header.end(); ++it)
+        {
+            if (it->first == "Content-Type" && !it->second.empty())
+                env_variable.push_back("CONTENT_TYPE=" + it->second);
 
-// 	cgi_pid = fork();
+            if (it->first == "Content-Length" && !it->second.empty())
+                env_variable.push_back("CONTENT_LENGTH=" + it->second);
+        }
+    }
+}
 
-// 	if(cgi_pid < 0)
-// 	{
-// 		stats = CGI_ERROR;
-// 		return ;
-// 	}
+void	CgiHandler::print_env_variable() const
+{
+	for (std::vector<std::string>::const_iterator it = env_variable.begin();
+		 it != env_variable.end(); ++it)
+		std::cout << *it << std::endl;
+}
 
-// 	if (cgi_pid == 0)
-// 	{
-// 		lauch_script(request, config, cgi_extention);
-// 	}
-// 	else
-// 	{
-// 		close(fd_in[0]);
-// 		close(fd_out[1]);
+bool	CgiHandler::cgi_exist(const std::string& cgi_extention, const std::string& target_file_path, PathInfo path_info)
+{
+	if (path_info != PATH_IS_FILE)
+        return (false);
 
-// 		this->pipe_out = fd_out[0];
-// 		this->pipe_in = fd_in[1];
+    if (target_file_path.empty())
+        return (false);
 
-// 		fcntl(pipe_out, F_SETFL, O_NONBLOCK);
-// 		fcntl(pipe_in, F_SETFL, O_NONBLOCK);
+    if (target_file_path.length() < cgi_extention.length())
+        return (false);
 
-//         if (request.method == "POST")
-//             stats = CGI_WRITING;
-//         else
-//             stats = CGI_READING;
-// 	}
-// }
+    if (target_file_path.compare(
+            target_file_path.length() - cgi_extention.length(),
+            cgi_extention.length(),
+            cgi_extention) != 0)
+    {
+        return (false);
+    }
+    if (access(target_file_path.c_str(), R_OK) != 0)
+	{
+		this->http_error_code = 403;
+		return (false);
+	}
+    return (true);
+}
+
+bool	CgiHandler::prepare_script(const std::string& cgi_extention,
+									const std::string& target_file_path, PathInfo path_info)
+{
+    if (!cgi_exist(cgi_extention, target_file_path, path_info))
+    {
+        this->stats = CGI_ERROR;
+        return (false);
+    }
+	return (true);
+}
+
+int	CgiHandler::handle_script(const Request& request, const std::string& cgi_extention, const std::string& executable,
+									const std::string& target_file_path, PathInfo path_info)
+{   
+    stats = CGI_INIT;
+	bytes_sended = 0;
+
+	this->response_buffer.clear();
+	// std::cerr << "CGI LAUCHED" << std:: endl;
+	create_env_variable(request, target_file_path);
+	// print_env_variable();
+	if (!prepare_script(cgi_extention, target_file_path, path_info))
+		return (this->http_error_code);
+
+	int	fd_in[2];
+	int	fd_out[2];
+
+	if (pipe(fd_in) < 0 || pipe(fd_out) < 0)
+	{
+		stats = CGI_ERROR;
+		// std::cerr << "ERROR HERE FROM PIPE" << std::endl;
+		this->http_error_code = 500;
+		return (this->http_error_code);
+	}
+	this->stats = CGI_INIT;
+	cgi_pid = fork();
+	// std::cerr << "FORKING" << std::endl;
+	if(cgi_pid < 0)
+	{
+		close(fd_in[0]);
+		close(fd_in[1]);
+		close(fd_out[0]);
+		close(fd_out[1]);
+		// std::cerr << "ERROR HERE FROM FORK" << std::endl;
+		this->http_error_code = 500;
+		stats = CGI_ERROR;
+		return (this->http_error_code);
+	}
+
+	if (cgi_pid == 0)
+	{
+		dup2(fd_in[0], STDIN_FILENO);
+		dup2(fd_out[1], STDOUT_FILENO);
+
+		close(fd_in[0]);
+		close(fd_in[1]);
+		close(fd_out[0]);
+		close(fd_out[1]);
+
+		this->envp = new char*[this->env_variable.size() + 1];
+		for (size_t i = 0; i < this->env_variable.size(); ++i)
+			this->envp[i] = const_cast<char*>(this->env_variable[i].c_str());
+		this->envp[this->env_variable.size()] = NULL;
+		
+		char	*argv[3];
+		argv[0] = const_cast<char*>(executable.c_str());
+		argv[1] = const_cast<char*>(target_file_path.c_str());
+		argv[2] = NULL;
+		
+
+
+        std::cerr << "Executable: [" << argv[0] << "]" << std::endl;
+        std::cerr << "Target File: [" << argv[1] << "]" << std::endl;
+
+        execve(argv[0], argv, this->envp);
+
+        // If we reach this line, execve FAILED! Let's print exactly why:
+		std::cerr << "EXECVE FAILED FATALLY: " << std::strerror(errno) << std::endl;
+        std::cerr << "--------------------" << std::endl;
+        
+        std::exit(1);
+	}
+	else
+	{
+		close(fd_in[0]);
+		close(fd_out[1]);
+
+		this->pipe_out = fd_out[0];
+		this->pipe_in = fd_in[1];
+
+		fcntl(pipe_out, F_SETFL, O_NONBLOCK);
+		fcntl(pipe_in, F_SETFL, O_NONBLOCK);
+
+		if (request.method == "POST")
+            this->stats = CGI_WRITING;
+        else
+            this->stats = CGI_READING;
+
+        return (200);
+	}
+	return (200);
+}

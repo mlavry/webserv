@@ -11,6 +11,7 @@
         a:hover { text-decoration: underline; }
         button { background-color: #ff4d4d; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
         button:hover { background-color: #cc0000; }
+        h3 { margin-bottom: 5px; color: #555; }
     </style>
 </head>
 <body>
@@ -46,6 +47,28 @@
         <p>Create a file named <b>delete_me.txt</b> in the root folder, then click this button.</p>
         <button onclick="testDelete()">Delete 'delete_me.txt'</button>
         <p id="delete-status"></p>
+    </div>
+
+    <div class="box">
+        <h2>5. Test CGI Execution (Pipes & Poll)</h2>
+        <p>These tests validate your non-blocking pipes, environment variables, and <code>execve</code> routing.</p>
+        
+        <h3>A. Standard GET (Python)</h3>
+        <ul>
+            <li><a href="/cgi-bin/index.py">Execute index.py</a> - <i>Tests basic execution and REQUEST_METHOD.</i></li>
+        </ul>
+
+        <h3>B. Query Strings (Bash)</h3>
+        <ul>
+            <li><a href="/cgi-bin/test.sh?user=cnamoune&project=webserv">Execute test.sh?user=...</a> - <i>Tests the QUERY_STRING environment variable.</i></li>
+        </ul>
+
+        <h3>C. POST Body (Pipe Write Test)</h3>
+        <p>This form will send a POST body to the Python script. Watch your server logs to see the <code>POLLOUT</code> event trigger your <code>handle_sending_data_to_cgi</code> function!</p>
+        <form action="/cgi-bin/index.py" method="POST">
+            <input type="text" name="test_data" value="Hello CGI Pipe!" style="padding: 8px; width: 200px;">
+            <button type="submit" style="background-color: #28a745;">Send POST to CGI</button>
+        </form>
     </div>
 
     <script>

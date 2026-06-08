@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/03 17:26:21 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/08 14:39:25 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,17 +51,6 @@ Request::Request()
     this->location_match = NULL; 
 }
 
-
-Request::~Request()
-{
-	this->method.clear();
-    this->path.clear();
-	header.clear();
-	body.clear();
-	keep_alive = false;
-    this->location_match = NULL; 
-}
-
 void    Request::clear()
 {
     this->method.clear();
@@ -69,6 +58,15 @@ void    Request::clear()
     header.clear();
     body.clear();
     this->location_match = NULL;
+}
+
+Request::~Request()
+{
+	this->method.clear();
+    this->path.clear();
+	header.clear();
+	body.clear();
+    this->location_match = NULL; 
 }
 
 void Request::print_body() const
@@ -112,7 +110,7 @@ void ClientRequest::parse_request_line(Request& request)
 		set_error_code(505);
 		return ;
 	}
-	size_t	query_pos = request.method.find("?");
+	size_t	query_pos = request.path.find("?");
 	if (query_pos != std::string::npos)
 	{
 		request.query = request.path.substr(query_pos + 1);

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 13:07:54 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/03 12:15:21 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/08 14:06:27 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,7 @@
 
 #include "Request.hpp"
 #include "Response.hpp"
-// #include "CgiHandler.hpp"
+#include "CgiHandler.hpp"
 #include <string>
 #include <cstddef>
 #include <ctime>
@@ -45,7 +45,7 @@ class Client
 		int				statusCode;
 		std::string 	ip;
 
-		// CgiHandler		cgi;
+		CgiHandler		cgi;
 };
 
 #endif

@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 17:40:29 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/02 16:34:12 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/07 18:25:11 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,10 +17,8 @@
 #include <errno.h>
 #include <dirent.h>
 #include "Request.hpp"
-#include "CgiHandler.hpp"
 
 
-class   CgiHandler;
 class   Client;
 
 enum	ResponseState
@@ -54,12 +52,14 @@ class HttpResponse
         int                                 status_code;
         std::map<std::string, std::string>  headers;
         std::vector<char>                   body;
-    
+        std::string                         executable;
         const ServerConfig*                 server_config;
         const LocationConfig*               location_config;
         std::string                         target_file_path;
-        
-        // void            handle_cgi(const Request& request, const ServerConfig *config, Client& client, std::string cgi_extention);
+        std::string     is_cgi_requested(const std::string& target_path);
+        void            handle_cgi(const Request& request, const ServerConfig *config,
+                                    Client& client, std::string cgi_extention,
+                                    const std::string& target_file_path, PathInfo path_info);
         void            handle_get(const Request& request);
         void            handle_post(const Request& request);
         void            handle_delete(const Request& request);
@@ -83,7 +83,9 @@ class HttpResponse
     
         HttpResponse();
         ~HttpResponse();
-
+        
+        void            parse_cgi_output(const std::vector<char>& cgi_outpout, const Request& request);
+        
         void            generate(const Request& request, const ServerConfig* config, Client& client);
         
         void            generate_error(int error_code, const ServerConfig* config, const Request& request);

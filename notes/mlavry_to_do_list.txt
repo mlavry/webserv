@@ -1,5 +1,9 @@
 ---- Correct -----
 
+- Ne pas oublier de re tester sur linux une fois patch // Faire des que possible
+
+- modif log ERROR
+
 - test envoie rien (nc) et donc methode = empty et path = empty
 
 - opti logger au niveau des methodes ?
@@ -10,4 +14,6 @@
 
 - modif launching conf 
 
-- BOMBARDER TEST AVANT COOKIES POUR BIEN TESTER QUE TOUT MARCHE (sur linux aussi)
+- check meme port 
+
+- stocker le serveur d'ecoute dans le client 

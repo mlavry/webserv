@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/14 17:15:28 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/03 16:54:54 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/08 14:19:02 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,31 +62,31 @@ static bool checkConfExtension(const std::string& path)
     return (true);
 }
 
-static void printLocationCgi(const std::vector<ServerConfig>& servers)
-{
-    for (size_t serverIndex = 0; serverIndex < servers.size(); ++serverIndex)
-    {
-        const ServerConfig& server = servers[serverIndex];
+// static void printLocationCgi(const std::vector<ServerConfig>& servers)
+// {
+//     for (size_t serverIndex = 0; serverIndex < servers.size(); ++serverIndex)
+//     {
+//         const ServerConfig& server = servers[serverIndex];
 
-        for (size_t locationIndex = 0; locationIndex < server.locations.size(); ++locationIndex)
-        {
-            const LocationConfig& location = server.locations[locationIndex];
+//         for (size_t locationIndex = 0; locationIndex < server.locations.size(); ++locationIndex)
+//         {
+//             const LocationConfig& location = server.locations[locationIndex];
 
-            if (location.cgi.empty() == true)
-            {
-                continue;
-            }
+//             if (location.cgi.empty() == true)
+//             {
+//                 continue;
+//             }
 
-            std::cout << "server[" << serverIndex << "] location[" << locationIndex << "] path="
-                      << location.path << std::endl;
-            for (std::map<std::string, std::string>::const_iterator it = location.cgi.begin();
-                 it != location.cgi.end(); ++it)
-            {
-                std::cout << "  " << it->first << " -> " << it->second << std::endl;
-            }
-        }
-    }
-}
+//             std::cout << "server[" << serverIndex << "] location[" << locationIndex << "] path="
+//                       << location.path << std::endl;
+//             for (std::map<std::string, std::string>::const_iterator it = location.cgi.begin();
+//                  it != location.cgi.end(); ++it)
+//             {
+//                 std::cout << "  " << it->first << " -> " << it->second << std::endl;
+//             }
+//         }
+//     }
+// }
 
 
 int main(int argc, char *argv[])
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     try
     {
         Config config(path);
-		printLocationCgi(config.getServers());
+		// printLocationCgi(config.getServers());
 		server.setConfig(config.getServers());
     }
     catch (const std::exception& e)

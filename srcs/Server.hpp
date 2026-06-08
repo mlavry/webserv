@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/03 12:39:03 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/08 14:07:30 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,8 +71,7 @@ class Server
 		void checkTimeouts();
 		void closeAllFds();
 		std::string makeListenKey(const std::string& host, int port);
-		void resetClientForNextRequet(Client& client);
-
+		void	resetClientForNextRequet(Client& client);
 		const ServerConfig* getMatchedServer(const std::string& host_header, int listenFd) const;
 
 		//------------ Methode logger ----------
@@ -92,8 +91,10 @@ class Server
 		bool handleTimeout(int i);
 
 		//------------ CGI ----------
-		
-		std::map<int, int> client_pipe;
+		bool				handle_sending_data_to_cgi(int i);
+		bool				handle_reading_data_to_cgi(int i);
+		void				connect_cgi_to_poll(Client& client);
+		std::map<int, int>	client_pipe;
 };
 
 #endif

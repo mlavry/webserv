@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 17:40:46 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/03 16:46:41 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/08 14:30:41 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,8 +92,12 @@ void	HttpResponse::assemble_response(const Request& request)
 	else
 		headers["Content-Length"] = "0";
 
-	//if (headers.find("Connection") == headers.end())
-	//	headers["Connection"] = "close";
+	if (request.header.find("Connection") == headers.end() || request.header.at("Connection") != "close")
+		headers["Connection"] = "keep_alive";
+    else
+    {
+        headers["Connection"] = "close";
+    }
 
 	std::map<std::string, std::string>::const_iterator	it;
 	for (it = headers.begin(); it != headers.end(); ++it)
@@ -310,19 +314,56 @@ void	HttpResponse::handle_head(const Request& request)
     assemble_response(request);
 }
 
-// void    HttpResponse::handle_cgi(const Request& request, const ServerConfig *config, Client& client, std::string cgi_extention)
-// {
-//     for (std::map<std::string, std::string>::const_iterator it = location_config->cgi.begin();
-//                  it != location_config->cgi.end(); ++it)
-//     {
-//         if (it->first == ".py" && !it->second.empty() || it->first == ".sh" && !it->second.empty())
-//         {
-//             client.cgi.handle_script(request, config, cgi_extention);
-//             if (client.cgi.stats == CGI_FINISHED)
-//                 assemble_response(request);
-//         }
-//     }
-// }
+void HttpResponse::handle_cgi(const Request& request, const ServerConfig *config, Client& client,
+                                std::string cgi_extention, const std::string& target_path_file, PathInfo path_info)
+{
+    this->status_code = client.cgi.handle_script(request, cgi_extention, executable, target_path_file, path_info);
+                
+    if (client.cgi.stats == CGI_ERROR)
+        generate_error(this->status_code, config, request);
+    return ;
+}
+
+void    HttpResponse::parse_cgi_output(const std::vector<char>& cgi_outpout, const Request& request)
+{
+    std::string delimiter = "\r\n\r\n";
+
+    std::vector<char>::const_iterator it = cgi_outpout.begin();
+    std::vector<char>::const_iterator end = cgi_outpout.end();
+    std::vector<char>::const_iterator header_end = std::search(it, end, delimiter.begin(), delimiter.end());
+
+    if (header_end != end)
+    {
+        std::string         header_str(it, header_end);
+        std::istringstream  header_stream(header_str);
+        std::string         line;
+
+        while (std::getline(header_stream, line))
+        {
+            size_t colon_pos = line.find(':');
+            if (colon_pos != std::string::npos)
+            {
+                std::string key = line.substr(0, colon_pos);
+                std::string value = line.substr(colon_pos + 1);
+                value.erase(0, value.find_first_not_of(" \t\r\n"));
+                value.erase(value.find_last_not_of(" \t\r\n") + 1);
+
+                if (key == "Status" || key == "status")
+                    this->status_code = std::atoi(value.c_str());
+                else
+                    headers[key] = value;
+            }
+        }
+        body.assign(header_end + 4, end);
+    }
+    else
+    {
+        // std::cerr << "ERROR HERE" << std::endl;
+        generate_error(500, server_config, request);
+        return ;
+    }
+    assemble_response(request);
+}
 
 void    HttpResponse::generate(const Request& request, const ServerConfig* config, Client& client)
 {
@@ -355,11 +396,13 @@ void    HttpResponse::generate(const Request& request, const ServerConfig* confi
 		if (this->location_config->methods.count(request.method) == 0)
 		return (generate_error(405, config, request));
 	}
-    (void)client;
-	// std::string cgi_extention = get_mime_type(this->target_file_path);
-    // if (cgi_extention == "cgi")
-    //     handle_cgi(request, config, client, cgi_extention);
-	if (request.method == "GET")
+
+    std::string cgi_extention = is_cgi_requested(this->target_file_path);
+    if (cgi_extention != "NO")
+    {
+        handle_cgi(request, config, client, cgi_extention, this->target_file_path, this->target_path_info);
+    }
+	else if (request.method == "GET")
         handle_get(request);
     else if (request.method == "POST")
         handle_post(request);
@@ -367,6 +410,26 @@ void    HttpResponse::generate(const Request& request, const ServerConfig* confi
         handle_delete(request);
     else if (request.method == "HEAD")
         handle_head(request);
+}
+
+std::string	HttpResponse::is_cgi_requested(const std::string& target_path)
+{
+    size_t extention_pos = target_path.find_last_of(".");
+    
+    if (extention_pos != std::string::npos)
+    {
+        std::string cgi_extention = target_path.substr(extention_pos, target_path.length());
+        for (std::map<std::string, std::string>::const_iterator it = location_config->cgi.begin();
+                 it != location_config->cgi.end(); ++it)
+        {
+            if (it->first == cgi_extention && !it->second.empty())
+            {
+                this->executable = it->second;
+				return (cgi_extention);
+            }
+        }
+    }
+    return ("NO");  
 }
 
 std::string	HttpResponse::get_status_message(int code) const
@@ -453,44 +516,14 @@ const char*	HttpResponse::get_response_data() const
 	return (raw_response.data() + bytes_sent);
 }
 
-PathInfo HttpResponse::get_path_info(const std::string& path) const
+std::string HttpResponse::select_active_index() const
 {
-    struct stat buffer;
-
-    if (stat(path.c_str(), &buffer) != 0)
-    {
-        if (errno == EACCES)
-		{
-        	return (PATH_PERMISSION_DENIED);
-    	} 
-    	return (PATH_DOES_NOT_EXIST);
-    }
-    if (S_ISDIR(buffer.st_mode))
-        return (PATH_IS_DIRECTORY);
-
-    return (PATH_IS_FILE);
-}
-
-void	HttpResponse::build_final_path(std::string& full_path)
-{
-	this->target_path_info = get_path_info(full_path);
-
-	if (target_path_info == PATH_DOES_NOT_EXIST)
-	{
-		this->status_code = 404;
-	}
-	else if (target_path_info == PATH_PERMISSION_DENIED)
-	{
-		this->status_code = 403;
-	}
-	else if (target_path_info == PATH_IS_FILE)
-	{
-		this->target_file_path = full_path;
-	}
-	else if (target_path_info == PATH_IS_DIRECTORY)
-	{
-        handle_directory_path(full_path);
-	}
+    std::string active_index = "index.html";
+    if (this->location_config && !this->location_config->index.empty())
+        active_index = this->location_config->index;
+    else if (this->server_config && !this->server_config->index.empty())
+        active_index = this->server_config->index;
+    return (active_index);
 }
 
 void HttpResponse::handle_directory_path(std::string& full_path)
@@ -524,15 +557,48 @@ void HttpResponse::handle_directory_path(std::string& full_path)
         this->status_code = 403;
 }
 
-std::string HttpResponse::select_active_index() const
+PathInfo HttpResponse::get_path_info(const std::string& path) const
 {
-    std::string active_index = "index.html";
-    if (this->location_config && !this->location_config->index.empty())
-        active_index = this->location_config->index;
-    else if (this->server_config && !this->server_config->index.empty())
-        active_index = this->server_config->index;
-    return (active_index);
+    struct stat buffer;
+
+    // std::cerr << path << std::endl;
+    if (stat(path.c_str(), &buffer) != 0)
+    {
+        if (errno == EACCES)
+		{
+        	return (PATH_PERMISSION_DENIED);
+    	}
+    	return (PATH_DOES_NOT_EXIST);
+    }
+    if (S_ISDIR(buffer.st_mode))
+        return (PATH_IS_DIRECTORY);
+
+    return (PATH_IS_FILE);
 }
+
+void	HttpResponse::build_final_path(std::string& full_path)
+{
+	this->target_path_info = get_path_info(full_path);
+
+	if (target_path_info == PATH_DOES_NOT_EXIST)
+	{
+		// std::cerr << "CGI DONT EXIST" << std::endl;
+        this->status_code = 404;
+	}
+	else if (target_path_info == PATH_PERMISSION_DENIED)
+	{
+		this->status_code = 403;
+	}
+	else if (target_path_info == PATH_IS_FILE)
+	{
+		this->target_file_path = full_path;
+	}
+	else if (target_path_info == PATH_IS_DIRECTORY)
+	{
+        handle_directory_path(full_path);
+	}
+}
+
 void HttpResponse::translate_path(const Request& request)
 {
     this->location_config = NULL;
