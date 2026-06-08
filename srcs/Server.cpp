@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/08 14:35:44 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/08 15:23:42 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -280,9 +280,10 @@ bool Server::initServer()
 			address.sin_addr.s_addr = inet_addr(_configs[i].listens[j].host.c_str());
 			
 			// On attache le socket a une adresse 
-			std::cout << "Trying bind: "
+			std::cout << GREEN << "Launching server on: "
           		<< _configs[i].listens[j].host << ":"
           		<< _configs[i].listens[j].port
+				<< RESET
           		<< std::endl;
 			if (bind(serverFd, (struct sockaddr *)&address, 
 				sizeof(address)) < 0)
@@ -348,7 +349,7 @@ bool Server::checkPoll()
 	{
 		if (errno == EINTR) // Need utility check (remettre errno a 0 apres ?)
 		{
-			std::cout << "\n" GREEN "Arret du serveur..." RESET << std::endl;
+			std::cout << "\n" GREEN "Closing server..." RESET << std::endl;
 			return (true);
 		} // if block no util comment
 		std::cerr << "Erreur poll" << std::endl;
@@ -768,7 +769,6 @@ bool Server::handleEvents()
 
 void Server::run()
 {
-	std::cout << GREEN "Lancement du serveur..." RESET << std::endl;
 	while (g_running)
 	{
 		if (!checkPoll())
