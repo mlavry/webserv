@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/08 14:39:25 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 15:42:48 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -124,7 +124,7 @@ bool ClientRequest::is_keep_alive(Request& request)
     std::map<std::string, std::string>::iterator it;
 
     it = request.header.find("Connection");
-    if (it != request.header.end() && it->second == "close")
+    if (it != request.header.end() && !it->second.empty() && it->second == "close")
         request.keep_alive = false;
 
     return (request.keep_alive);
@@ -231,13 +231,26 @@ int	ClientRequest::is_crlf_correct(int code)
 	return (1);
 }
 
+bool	ClientRequest::check_the_size(const Request& request)
+{
+	if (request.body.size() > 100000001)
+		return (true);
+	if (config && config->hasClientMaxBodySize)
+	{
+		if (request.body.size() > config->clientMaxBodySize)
+			return (true);
+	}
+	return (false);
+}
+
 void	ClientRequest::parse_chunked_body(Request& request)
 {
 	while (status == READING_CHUNKED)
 	{
 		if (crlf_received)
 		{
-			is_crlf_correct(0);
+			if (is_crlf_correct(0) == 1)
+				is_keep_alive(request);
 			return ;
 		}
 
@@ -275,11 +288,17 @@ void	ClientRequest::parse_chunked_body(Request& request)
 			if (is_crlf_correct(1) <= 0)
 				return ;
 		}
+		if (check_the_size(request))
+		{
+			this->http_error_code = 413;
+		}
 	}
 }
 
-void	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, Request& request)
+void	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, Request& request, const ServerConfig* active_config)
 {
+	config = active_config;
+
 	if (buffer && bytes_read > 0)
 		data.append(buffer, bytes_read);
 
@@ -292,7 +311,11 @@ void	ClientRequest::parse_chunk(const char *buffer, size_t bytes_read, Request& 
 		if (status == READING_BODY)
 			parse_body(request);
 		if (status == READING_CHUNKED)
+		{
 			parse_chunked_body(request);
+			if (status == READING_CHUNKED)
+				break ;
+		}
 
 		if (status == READING_REQUEST)
 			break ;

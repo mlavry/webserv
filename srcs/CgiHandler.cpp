@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/31 14:32:21 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/08 15:13:32 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 01:40:10 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@ CgiHandler::CgiHandler() : cgi_pid(-1), stats(STAND_BY), envp(NULL), bytes_sende
 {
     pipe_out = -1;
     pipe_in = -1;
+	http_error_code = 500;
 }
 
 CgiHandler::~CgiHandler()
@@ -39,21 +40,52 @@ void	CgiHandler::create_env_variable(const Request& request, const std::string& 
     if (request.method == "GET" || request.method == "POST")
         env_variable.push_back("REQUEST_METHOD=" + request.method);
 
-    env_variable.push_back("QUERY_STRING=" + request.query);
+    if (request.method == "GET")
+        env_variable.push_back("QUERY_STRING=" + request.query);
+    else
+        env_variable.push_back("QUERY_STRING="); // Good practice to always initialize it
+
     env_variable.push_back("PATH_INFO=" + request.path);
     env_variable.push_back("SCRIPT_FILENAME=" + target_file_path);
+    env_variable.push_back("SERVER_PROTOCOL=" + request.http_version);
 
     if (request.method == "POST")
     {
-        for (std::map<std::string, std::string>::const_iterator it = request.header.begin();
-             it != request.header.end(); ++it)
-        {
-            if (it->first == "Content-Type" && !it->second.empty())
-                env_variable.push_back("CONTENT_TYPE=" + it->second);
+        std::stringstream ss;
+        ss << request.body.size();
+        env_variable.push_back("CONTENT_LENGTH=" + ss.str());
+    }
 
-            if (it->first == "Content-Length" && !it->second.empty())
-                env_variable.push_back("CONTENT_LENGTH=" + it->second);
+    // Convert all request headers into HTTP_ CGI environment variables
+    for (std::map<std::string, std::string>::const_iterator it = request.header.begin();
+         it != request.header.end(); ++it)
+    {
+        std::string key = it->first;
+
+        // Content-Type is a special CGI variable that doesn't get the HTTP_ prefix
+        if (key == "Content-Type")
+        {
+            env_variable.push_back("CONTENT_TYPE=" + it->second);
+            continue;
         }
+        
+        // Content-Length is handled above based on actual body size, ignore the client's header
+        if (key == "Content-Length" || key == "Transfer-Encoding")
+        {
+            continue;
+        }
+
+        // Format the key: prefix with HTTP_, uppercase letters, '-' becomes '_'
+        std::string cgi_key = "HTTP_";
+        for (size_t i = 0; i < key.length(); ++i)
+        {
+            if (key[i] == '-')
+                cgi_key += '_';
+            else
+                cgi_key += std::toupper(key[i]);
+        }
+
+        env_variable.push_back(cgi_key + "=" + it->second);
     }
 }
 
@@ -66,9 +98,9 @@ void	CgiHandler::print_env_variable() const
 
 bool	CgiHandler::cgi_exist(const std::string& cgi_extention, const std::string& target_file_path, PathInfo path_info)
 {
-	if (path_info != PATH_IS_FILE)
-        return (false);
-
+	// if (path_info != PATH_IS_FILE)
+    //     return (false);
+	(void)path_info;
     if (target_file_path.empty())
         return (false);
 
@@ -82,11 +114,11 @@ bool	CgiHandler::cgi_exist(const std::string& cgi_extention, const std::string& 
     {
         return (false);
     }
-    if (access(target_file_path.c_str(), R_OK) != 0)
-	{
-		this->http_error_code = 403;
-		return (false);
-	}
+    // if (access(target_file_path.c_str(), R_OK) != 0)
+	// {
+	// 	this->http_error_code = 403;
+	// 	return (false);
+	// }
     return (true);
 }
 
@@ -110,7 +142,7 @@ int	CgiHandler::handle_script(const Request& request, const std::string& cgi_ext
 	this->response_buffer.clear();
 	// std::cerr << "CGI LAUCHED" << std:: endl;
 	create_env_variable(request, target_file_path);
-	// print_env_variable();
+	print_env_variable();
 	if (!prepare_script(cgi_extention, target_file_path, path_info))
 		return (this->http_error_code);
 

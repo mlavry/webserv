@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/08 14:07:30 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/08 18:50:32 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -76,6 +76,7 @@ class Server
 
 		//------------ Methode logger ----------
 		std::string methodColor(const std::string& method) const;
+		void printRecvData(const char* data, int bytes) const;
 		void printRequestHeader(const Request& request) const;
 		void printResponseHeader(const HttpResponse& response) const;
 		void printLog(const Client& client) const;

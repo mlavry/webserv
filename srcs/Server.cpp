@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
+/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/08 15:23:42 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/10 15:42:34 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,9 +22,9 @@
 #define CYAN    "\033[36m"
 #define WHITE   "\033[37m"
 
-#define HEADER_TIMEOUT 30
-#define BODY_TIMEOUT 30
-#define SEND_TIMEOUT 30
+#define HEADER_TIMEOUT 120
+#define BODY_TIMEOUT 120
+#define SEND_TIMEOUT 120
 
 #include "Server.hpp"
 
@@ -126,6 +126,16 @@ std::string Server::statusColor(int status) const
 	if (status >= 500)
 		return (RED);
 	return (WHITE);
+}
+
+void Server::printRecvData(const char* data, int bytes) const
+{
+	if (!data || bytes <= 0)
+		return;
+
+	std::cout << BOLD << MAGENTA << "recv " << RESET << bytes << " bytes" << std::endl;
+	std::cout.write(data, bytes);
+	std::cout << std::endl;
 }
 
 std::string Server::truncString(const std::string& str, size_t max) const
@@ -280,10 +290,9 @@ bool Server::initServer()
 			address.sin_addr.s_addr = inet_addr(_configs[i].listens[j].host.c_str());
 			
 			// On attache le socket a une adresse 
-			std::cout << GREEN << "Launching server on: "
+			std::cout << "Trying bind: "
           		<< _configs[i].listens[j].host << ":"
           		<< _configs[i].listens[j].port
-				<< RESET
           		<< std::endl;
 			if (bind(serverFd, (struct sockaddr *)&address, 
 				sizeof(address)) < 0)
@@ -349,7 +358,7 @@ bool Server::checkPoll()
 	{
 		if (errno == EINTR) // Need utility check (remettre errno a 0 apres ?)
 		{
-			std::cout << "\n" GREEN "Closing server..." RESET << std::endl;
+			std::cout << "\n" GREEN "Arret du serveur..." RESET << std::endl;
 			return (true);
 		} // if block no util comment
 		std::cerr << "Erreur poll" << std::endl;
@@ -515,7 +524,7 @@ bool Server::handleClient(int i)
 	char buffer[1024];
 
 	int bytes = recv(_fds[i].fd, buffer, sizeof(buffer), 0);
-
+	
 	if (bytes < 0)
 	{
 		std::cout << "recv < 0 bytes" << std::endl;
@@ -524,13 +533,15 @@ bool Server::handleClient(int i)
 	}
 	else if (bytes > 0)
 	{
+		// printRecvData(buffer, bytes);
 		client.lastActivity = std::time(NULL);
 		if (!client.hasStartTime)
 		{
 			client.startTime = std::time(NULL);
 			client.hasStartTime = true;
 		}
-		client.parser.parse_chunk(buffer, bytes, client.request);
+		const ServerConfig* request_config = getMatchedServer("", client.listenFd);
+		client.parser.parse_chunk(buffer, bytes, client.request, request_config);
 	}
 
 	state = client.parser.get_status();
@@ -666,7 +677,8 @@ bool	Server::handle_sending_data_to_cgi(int i)
 		{
 			close(pipe_fd_in);
 			client_pipe.erase(pipe_fd_in);
-			client.cgi.stats = CGI_READING;
+			if (client.cgi.stats != CGI_FINISHED)
+				client.cgi.stats = CGI_READING;
 			_fds.erase(_fds.begin() + i);
 			return (true);
 		}
@@ -680,7 +692,7 @@ bool	Server::handle_reading_data_to_cgi(int i)
 	Client &client = _clients[client_pipe[pipe_fd_out]];
 	char	buffer[1024];
 
-	if (client.cgi.stats == CGI_READING)
+	if (client.cgi.stats == CGI_READING || client.cgi.stats == CGI_WRITING)
 	{
 		int	bytes_readed = read(pipe_fd_out, buffer, sizeof(buffer));
 		if (bytes_readed < 0)
@@ -769,6 +781,7 @@ bool Server::handleEvents()
 
 void Server::run()
 {
+	std::cout << GREEN "Lancement du serveur..." RESET << std::endl;
 	while (g_running)
 	{
 		if (!checkPoll())

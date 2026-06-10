@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:22 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/08 14:09:07 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 15:43:08 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,7 +49,8 @@ struct Request
 	std::vector<char>	                body;
 
 	const LocationConfig*				location_match;
-	void			clear();
+	void								clear();
+	
 };
 
 class ClientRequest
@@ -82,13 +83,13 @@ class ClientRequest
 		size_t			current_data_size_readed;
 		bool			reading_data_chunked;
 		bool			crlf_received;
-
+		bool			check_the_size(const Request& request);
 		
 	public:
         ClientRequest();
         ~ClientRequest();
 
-		void			parse_chunk(const char *buffer, size_t bytes_read, Request& request);
+		void			parse_chunk(const char *buffer, size_t bytes_read, Request& request, const ServerConfig* config);
 		RequestState	get_status() const;
 		
 		int				get_error_code() const;

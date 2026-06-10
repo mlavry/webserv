@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/14 17:15:28 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/08 14:19:02 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 00:57:08 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 {
 	signal(SIGINT, handle_signal);
 	signal(SIGTERM, handle_signal);
-
+    signal(SIGPIPE, SIG_IGN);
 	Server server;
 	
     std::string path;

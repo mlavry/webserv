@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 17:40:29 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/07 18:25:11 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 15:34:41 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -56,6 +56,7 @@ class HttpResponse
         const ServerConfig*                 server_config;
         const LocationConfig*               location_config;
         std::string                         target_file_path;
+
         std::string     is_cgi_requested(const std::string& target_path);
         void            handle_cgi(const Request& request, const ServerConfig *config,
                                     Client& client, std::string cgi_extention,
@@ -67,15 +68,18 @@ class HttpResponse
         
         bool            build_error_from_error_page(int error_code, const ServerConfig *config, const Request& request);
         void            build_autoindex(const std::string& directory_path, const Request& request);
-        void            build_final_path(std::string& full_path);
+        void            build_url(const Request& request);
+        void            build_final_path(std::string full_path, const Request& request);
         void            handle_directory_path(std::string& full_path);
         std::string     select_active_index() const;
         
         void            assemble_response(const Request& request);
         std::string     get_mime_type(const std::string& file_path);
         std::string     get_status_message(int code) const;
+        void            print_cgi_output(const std::vector<char>& cgi_output) const;
     
         void            translate_path(const Request& request);
+        bool            body_size_to_big(const Request& request) const;
         bool            extract_multipart_file(const std::vector<char>& body, std::string& out_filename,
                                             size_t& out_start, size_t& out_length);
 

@@ -6,7 +6,7 @@
 /*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 17:40:46 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/08 14:30:41 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 15:36:47 by cnamoune         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,11 +92,16 @@ void	HttpResponse::assemble_response(const Request& request)
 	else
 		headers["Content-Length"] = "0";
 
-	if (request.header.find("Connection") == headers.end() || request.header.at("Connection") != "close")
-		headers["Connection"] = "keep_alive";
-    else
+    std::map<std::string, std::string>::const_iterator	const_it = request.header.find("Connection");
+	if (const_it == request.header.end())
+		headers["Connection"] = "keep-alive";
+    else if (!const_it->second.empty() && const_it->second == "close")
     {
         headers["Connection"] = "close";
+    }
+    else
+    {
+        headers["Connection"] = "keep-alive";
     }
 
 	std::map<std::string, std::string>::const_iterator	it;
@@ -124,7 +129,8 @@ void HttpResponse::build_autoindex(const std::string& directory_path, const Requ
     DIR* directory = opendir(directory_path.c_str());
     if (!directory)
     {
-        generate_error(500, server_config, request);
+        std::cerr << "Error 500 from opendir" << std::endl;
+		generate_error(500, server_config, request);
         return ;
     }
 
@@ -199,10 +205,40 @@ bool HttpResponse::extract_multipart_file(const std::vector<char>& body, std::st
     return (false);
 }
 
-void HttpResponse::handle_post(const Request& request)
+bool	HttpResponse::body_size_to_big(const Request& request) const
 {
-    if (!this->location_config || !this->location_config->uploadEnabled)
-        return generate_error(403, server_config, request);
+	size_t max_size = 0;
+
+	if (location_config && location_config->hasClientMaxBodySize)
+		max_size = location_config->clientMaxBodySize;
+	if (request.body.size() > max_size)
+		return (true);
+
+	return (false);
+}
+
+void	HttpResponse::handle_post(const Request& request)
+{
+	if (!this->location_config)
+    {
+		std::cerr << "ERROR 403 FROM HERE" << std::endl;
+		return (generate_error(403, server_config, request));
+    }
+	if (body_size_to_big(request))
+	{
+		std::cerr << "ERROR 413 FROM HERE" << std::endl;
+		return (generate_error(413, server_config, request));
+	}
+	if (this->location_config->uploadStore.empty())
+	{
+		this->status_code = 200;
+		this->headers["Content-Type"] = "text/plain";
+		
+		std::string ok_body = "POST body received\n";
+		this->body.assign(ok_body.begin(), ok_body.end());
+        assemble_response(request);
+        return ;
+	}
 
     std::string upload_directory_path = this->location_config->uploadStore;
 
@@ -221,20 +257,25 @@ void HttpResponse::handle_post(const Request& request)
     {
         std::cout << "There is a multipart" << std::endl;
         if (!extract_multipart_file(request.body, filename, file_start, file_length))
-            return generate_error(400, server_config, request);
+            return (generate_error(400, server_config, request));
     }
     else
     {
         size_t last_slash = request.path.find_last_of('/');
         if (last_slash != std::string::npos && last_slash < request.path.length() - 1)
+		{
             filename = request.path.substr(last_slash + 1);
+		}
     }
 
     std::string		final_output_path = upload_directory_path + filename;
     std::ofstream	output_file(final_output_path.c_str(), std::ios::binary);
     
     if (!output_file.is_open())
-        return generate_error(500, server_config, request);
+	{
+        std::cerr << "Error 500 from open file" << std::endl;
+		return (generate_error(500, server_config, request));
+	}
 
     output_file.write(&request.body[file_start], file_length);
     output_file.close();
@@ -324,8 +365,17 @@ void HttpResponse::handle_cgi(const Request& request, const ServerConfig *config
     return ;
 }
 
+void HttpResponse::print_cgi_output(const std::vector<char>& cgi_output) const
+{
+    std::cout << "CGI output:\n";
+    std::cout.write(&cgi_output[0], cgi_output.size());
+    std::cout << std::endl;
+}
+
 void    HttpResponse::parse_cgi_output(const std::vector<char>& cgi_outpout, const Request& request)
 {
+    // print_cgi_output(cgi_outpout);
+
     std::string delimiter = "\r\n\r\n";
 
     std::vector<char>::const_iterator it = cgi_outpout.begin();
@@ -358,7 +408,7 @@ void    HttpResponse::parse_cgi_output(const std::vector<char>& cgi_outpout, con
     }
     else
     {
-        // std::cerr << "ERROR HERE" << std::endl;
+        std::cerr << "ERROR HERE" << std::endl;
         generate_error(500, server_config, request);
         return ;
     }
@@ -372,12 +422,19 @@ void    HttpResponse::generate(const Request& request, const ServerConfig* confi
     this->server_config = config;
 
     if (!this->server_config)
-        return (generate_error(500, server_config, request));
+	{
+        std::cerr << "Error 500 from server config" << std::endl;
+		return (generate_error(500, server_config, request));
+	}
 
     state = RESPONSE_BUILDING;
 
 	translate_path(request);
-	
+	std::string cgi_extention = is_cgi_requested(this->target_file_path);
+    if (cgi_extention != "NO" && this->status_code == 404)
+	{
+		this->status_code = 200;
+	}
 	if (status_code != 200)
 	{
 		if (this->status_code >= 300 && this->status_code < 400)
@@ -396,9 +453,8 @@ void    HttpResponse::generate(const Request& request, const ServerConfig* confi
 		if (this->location_config->methods.count(request.method) == 0)
 		return (generate_error(405, config, request));
 	}
-
-    std::string cgi_extention = is_cgi_requested(this->target_file_path);
-    if (cgi_extention != "NO")
+    // std::string cgi_extention = is_cgi_requested(this->target_file_path);
+    if (cgi_extention != "NO" && request.method == "POST")
     {
         handle_cgi(request, config, client, cgi_extention, this->target_file_path, this->target_path_info);
     }
@@ -480,10 +536,6 @@ std::string	HttpResponse::get_mime_type(const std::string& file_path)
         return "image/gif";
     if (ext == "pdf")
         return "application/pdf";
-    if (ext == "py")
-        return ("cgi");
-    if (ext == "sh")
-        return ("cgi");
     return "application/octet-stream";
 }
 
@@ -549,12 +601,18 @@ void HttpResponse::handle_directory_path(std::string& full_path)
 
     bool autoindex_on = false;
     if (this->location_config && this->location_config->hasAutoindex)
-        autoindex_on = this->location_config->autoindex;
-
+    {
+		autoindex_on = this->location_config->autoindex;
+	}
+	
+	std::cerr << full_path << "Before trying auto index" << std::endl;
     if (autoindex_on)
         this->target_file_path = full_path;
     else
-        this->status_code = 403;
+    {
+        std::cerr << "404 FROM HANDLE DIRECTORY PATH" << std::endl;
+        this->status_code = 404;
+    }
 }
 
 PathInfo HttpResponse::get_path_info(const std::string& path) const
@@ -576,13 +634,14 @@ PathInfo HttpResponse::get_path_info(const std::string& path) const
     return (PATH_IS_FILE);
 }
 
-void	HttpResponse::build_final_path(std::string& full_path)
+void	HttpResponse::build_final_path(std::string full_path, const Request& request)
 {
 	this->target_path_info = get_path_info(full_path);
+    this->target_file_path = full_path;
 
-	if (target_path_info == PATH_DOES_NOT_EXIST)
+	if (target_path_info == PATH_DOES_NOT_EXIST && request.method != "POST")
 	{
-		// std::cerr << "CGI DONT EXIST" << std::endl;
+		std::cerr << "ERROR FROM BUILD FINAL PATH" << std::endl;
         this->status_code = 404;
 	}
 	else if (target_path_info == PATH_PERMISSION_DENIED)
@@ -599,7 +658,32 @@ void	HttpResponse::build_final_path(std::string& full_path)
 	}
 }
 
-void HttpResponse::translate_path(const Request& request)
+void	HttpResponse::build_url(const Request& request)
+{
+	std::string	active_root = server_config->root;
+	std::string	path_to_join = request.path;
+	bool		location_root = false;
+
+	if (this->location_config && !this->location_config->root.empty())
+	{
+		location_root = true;
+		active_root = this->location_config->root;
+	}
+	std::cerr << active_root << " IS THE ACTIVE ROOT"<< std::endl;
+	
+	if (!active_root.empty() && active_root[active_root.length() - 1] == '/')
+		active_root.erase(active_root.length() - 1);
+	
+	if (location_root)
+		path_to_join = request.path.substr(this->location_config->path.length());
+	
+	if (!path_to_join.empty() && path_to_join[0] != '/')
+		path_to_join = "/" + path_to_join;
+	// std::cerr << active_root << "Is the active root before build final pth" << std::cout;
+	build_final_path(active_root + path_to_join, request);
+}
+
+void	HttpResponse::translate_path(const Request& request)
 {
     this->location_config = NULL;
     size_t longest_match = 0;
@@ -626,18 +710,8 @@ void HttpResponse::translate_path(const Request& request)
         this->status_code = this->location_config->redirectCode;
         return ;
     }
-    
-    std::string active_root = server_config->root;
-    
-    if (this->location_config && !this->location_config->root.empty())
-        active_root = this->location_config->root;
-    
-    if (!active_root.empty() && active_root[active_root.length() - 1] == '/')
-        active_root.erase(active_root.length() - 1);
-    
-    std::string full_path = active_root + request.path;
-    
-    build_final_path(full_path);
+	
+    build_url(request);
 }
 
 void HttpResponse::reset()
@@ -647,6 +721,7 @@ void HttpResponse::reset()
     state = RESPONSE_BUILDING;
     location_config = NULL;
     target_file_path.clear();
+    executable.clear();
     body.clear();
     raw_response.clear();
     headers.clear();
