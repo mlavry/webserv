@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.hpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 17:40:29 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/10 15:34:41 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 18:18:22 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,6 +83,8 @@ class HttpResponse
         bool            extract_multipart_file(const std::vector<char>& body, std::string& out_filename,
                                             size_t& out_start, size_t& out_length);
 
+		void 			build_theme_cookie_response(const Request& request, 
+							const std::string& theme);
     public:
     
         HttpResponse();

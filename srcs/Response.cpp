@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 17:40:46 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/10 17:07:56 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/10 18:30:24 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -298,7 +298,7 @@ void	HttpResponse::handle_get(const Request& request)
         build_autoindex(target_file_path, request);
         return ;
     }
-
+	std::cerr << target_file_path << std::endl;
     std::ifstream file(target_file_path.c_str(), std::ios::binary);
 
     body.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
@@ -415,6 +415,16 @@ void    HttpResponse::parse_cgi_output(const std::vector<char>& cgi_outpout, con
     assemble_response(request);
 }
 
+void 	HttpResponse::build_theme_cookie_response(const Request& request, 
+			const std::string& theme)
+{
+	status_code = 302;
+	headers["Location"] = "/";
+	headers["Set-Cookie"] = "theme=" + theme + "; Path=/; Max-Age=3600";
+	body.clear();
+	assemble_response(request);
+}
+
 void    HttpResponse::generate(const Request& request, const ServerConfig* config, Client& client)
 {
 	reset();
@@ -428,6 +438,17 @@ void    HttpResponse::generate(const Request& request, const ServerConfig* confi
 	}
 
     state = RESPONSE_BUILDING;
+
+	if (request.method == "GET" && request.path == "/set-theme-dark")
+	{
+		build_theme_cookie_response(request, "dark");
+		return ;
+	}
+	if (request.method == "GET" && request.path == "/set-theme-light")
+	{
+		build_theme_cookie_response(request, "light");
+		return ;
+	}
 
 	translate_path(request);
 	std::string cgi_extention = is_cgi_requested(this->target_file_path);
@@ -495,6 +516,7 @@ std::string	HttpResponse::get_status_message(int code) const
 		case 200:	return "OK";
 		case 201:	return "Created";
 		case 204:	return "No Content";
+		case 302:	return "Found";
 		case 400:	return "Bad Request";
 		case 401:	return "Unauthorized";
 		case 403:	return "Forbidden";

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/10 15:42:34 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/10 23:30:15 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,9 +22,9 @@
 #define CYAN    "\033[36m"
 #define WHITE   "\033[37m"
 
-#define HEADER_TIMEOUT 120
-#define BODY_TIMEOUT 120
-#define SEND_TIMEOUT 120
+#define HEADER_TIMEOUT 30
+#define BODY_TIMEOUT 30
+#define SEND_TIMEOUT 30
 
 #include "Server.hpp"
 
