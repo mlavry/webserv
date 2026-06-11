@@ -11,7 +11,8 @@ srcs/Server.cpp \
 srcs/Client.cpp \
 srcs/Response.cpp \
 srcs/CgiHandler.cpp \
-srcs/Request.cpp
+srcs/Request.cpp \
+srcs/RequestCookies.cpp
 
 OBJ = $(SRC:.cpp=.o)
 

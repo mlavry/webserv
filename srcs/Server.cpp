@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:39 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/10 23:30:15 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/11 15:57:08 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -517,6 +517,19 @@ const ServerConfig* Server::getMatchedServer(const std::string& host_header, int
     return (port_configs[0]);
 }
 
+void Server::print_cookie(Request& request)
+{
+	std::map<std::string, std::string>::iterator it;
+
+	it = request.cookies.begin();
+	while (it != request.cookies.end())
+	{
+		std::cout << "COOKIE [" << it->first << "] = "
+			<< it->second << std::endl;
+		++it;
+	}
+}
+
 bool Server::handleClient(int i)
 {
 	Client &client = _clients[_fds[i].fd];
@@ -572,7 +585,7 @@ bool Server::handleClient(int i)
 	if (state == COMPLETE)
 	{
 		printRequestHeader(client.request);
-		// client.isKeepAlive = client.request.keep_alive;
+		print_cookie(client.request);
 		client.response_builder.generate(client.request, active_config, client);
 		client.isKeepAlive = client.request.keep_alive;
 		client.statusCode = client.response_builder.get_http_status();

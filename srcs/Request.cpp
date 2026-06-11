@@ -3,14 +3,15 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:26 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/10 15:42:48 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/11 15:50:55 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Request.hpp"
+#include "RequestCookies.hpp"
 #include <cstdlib>
 #include <cerrno>
 #include <iostream>
@@ -58,6 +59,7 @@ void    Request::clear()
     header.clear();
     body.clear();
     this->location_match = NULL;
+	cookies.clear();
 }
 
 Request::~Request()
@@ -67,6 +69,7 @@ Request::~Request()
 	header.clear();
 	body.clear();
     this->location_match = NULL; 
+	cookies.clear();
 }
 
 void Request::print_body() const
@@ -445,6 +448,9 @@ void ClientRequest::parse_headers(Request& request)
 				value.erase(0, 1);
 
 			request.header[key] = value;
+
+			if (key == "Cookie")
+				parse_cookies(request, value);
 		}
 		else
 		{

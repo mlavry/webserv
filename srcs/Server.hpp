@@ -6,7 +6,7 @@
 /*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 13:22:25 by mlavry            #+#    #+#             */
-/*   Updated: 2026/06/10 17:48:51 by mlavry           ###   ########.fr       */
+/*   Updated: 2026/06/11 15:54:23 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,11 +31,6 @@ struct TimeoutConfig
 	int sendTimeout;
 
 	TimeoutConfig();
-};
-
-struct Session
-{
-	
 };
 
 class Server
@@ -90,6 +85,7 @@ class Server
 		std::string statusColor(int status) const;
 		std::string truncString(const std::string& str, size_t max) const;
 		double getResponseTime(const Client& client) const;
+		void print_cookie(Request& request);
 
 		//------------ Methode Timeout ----------
 		int getTimeoutClient(const Client& client, short events) const;

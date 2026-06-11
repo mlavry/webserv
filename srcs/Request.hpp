@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: cnamoune <cnamoune@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mlavry <mlavry@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 14:43:22 by cnamoune          #+#    #+#             */
-/*   Updated: 2026/06/10 15:43:08 by cnamoune         ###   ########.fr       */
+/*   Updated: 2026/06/11 12:46:52 by mlavry           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,6 +41,8 @@ struct Request
 	std::string							get_host() const;
 
     std::map<std::string, std::string>  header;
+
+	std::map<std::string, std::string>	cookies;
 
 	// bool								is_a_file();
 	bool								keep_alive;
